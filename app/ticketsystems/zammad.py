@@ -12,7 +12,7 @@ import json
 import os
 from collections.abc import Mapping
 
-from ..models import Category, Priority
+from ..models import Priority
 from .base import InboundTicket, TicketSystem, WebhookError
 
 PRIORITY_ID = {Priority.P1: 3, Priority.P2: 3, Priority.P3: 2, Priority.P4: 1}

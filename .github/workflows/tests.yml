@@ -2,11 +2,15 @@ name: tests
 on: [push, pull_request]
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
-      - run: pip install -r requirements.txt
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -r requirements.txt ruff
+      - run: ruff check .
       - run: pytest -q

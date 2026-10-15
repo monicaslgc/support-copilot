@@ -25,7 +25,14 @@ uvicorn app.main:app --reload     # interactive docs at http://127.0.0.1:8000/do
 pytest
 ```
 
-Without `ANTHROPIC_API_KEY` it classifies with keyword rules (offline, deterministic). With the key it uses Claude (`TRIAGE_MODEL`, default `claude-haiku-5-5`) and falls back to the rules if the API call fails. The LLM path is not covered by the offline test suite.
+### Claude or rules
+
+Without credentials the app classifies with keyword rules (offline, deterministic). With `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) it uses Claude to classify tickets and draft replies from the matching KB articles.
+
+- Model: `claude-opus-5-5` by default. Set `TRIAGE_MODEL` to change it, for example `claude-haiku-5-5` for cheaper bulk triage. Requests use low effort, a 20 s timeout and one retry, so a slow model call cannot hang a webhook.
+- The ticket text is fenced in `<ticket>` tags and the system prompt tells the model to treat it as data. A human still reviews every reply before it is sent.
+- If the model refuses, is cut off, answers with something that is not valid JSON, or the API is down, the ticket is still triaged: the app falls back to the rules, logs why, and says so in the triage rationale (`LLM unavailable (...)`) and `source: "rules"`.
+- The Claude path is tested against a fake SDK, not against the live API.
 
 ## API
 
@@ -37,6 +44,9 @@ Without `ANTHROPIC_API_KEY` it classifies with keyword rules (offline, determini
 | POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`) |
 | GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`) |
 | GET | `/metrics` | Human vs AI agreement and reply edit rate |
+| GET | `/health` | Liveness, whether the LLM is enabled, which ticket systems are configured |
+
+Set `API_KEY` and send it as `X-API-Key` to protect everything except `/health` and the webhooks (which use each system's own signature). If `API_KEY` is not set the API is open, which is only fine on a local machine.
 
 ## Ticket system integrations
 
@@ -65,7 +75,7 @@ Guarantees, enforced by the same end-to-end tests for every system:
 Environment variables:
 - Zammad: `ZAMMAD_URL`, `ZAMMAD_TOKEN`, `ZAMMAD_WEBHOOK_SECRET`
 - Zendesk: `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN`, `ZENDESK_WEBHOOK_SECRET`
-- Core: `ANTHROPIC_API_KEY`, `TRIAGE_MODEL`, `TRIAGE_DB`
+- Core: `ANTHROPIC_API_KEY`, `TRIAGE_MODEL`, `TRIAGE_DB`, `API_KEY`
 
 Always set the webhook secret in production; without it the webhook endpoint accepts any caller.
 
@@ -86,7 +96,14 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 
 ## Tests
 
-40 tests. The end-to-end scenarios run against stateful fakes of both APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent. I checked that they catch real bugs by breaking the code on purpose (public/internal swapped, tags overwritten, wrong priority map, wrong signature algorithm, missing idempotency, ids colliding across systems): each break made tests fail.
+79 tests, run on Python 3.11 and 3.12 in CI together with `ruff`.
+
+- **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
+- **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
+- **Concurrency:** 8 threads reviewing the same ticket (exactly one wins, the customer gets one reply), 8 identical webhooks (one ticket, one note, no 500s), and a deterministic version of the same race.
+- **Security and limits:** API key on every protected route, webhook signatures, oversized webhooks, review actions that are not approved/rejected.
+
+I checked that the tests catch real bugs by breaking the code on purpose, 20+ ways (public/internal swapped, tags overwritten, wrong priority map, wrong signature algorithm, missing idempotency, ids colliding across systems, non-atomic review, unlocked database reads, reading `content[0]` instead of the text block, the old `max_tokens`, a 10 minute timeout, unhandled refusals, no API key check, no size limit): each break made at least one test fail.
 
 ## Known limitations
 
@@ -94,7 +111,9 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 - Retrieval is TF-IDF over four sample articles, so it returns occasional irrelevant matches. Embeddings (for example pgvector) are the next step.
 - Rule-based classification is a baseline, not a production classifier.
 - No automatic retry for failed ticket-system calls; no check on webhook timestamp age.
-- No authentication on the review endpoints. A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.
+- A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.
+- A single SQLite connection behind a lock: fine for one instance, not for several. Use PostgreSQL to scale out.
+- The API key is one shared secret, not per-user auth, so reviews are attributed to whatever `reviewer` string the caller sends.
 
 ## Next steps
 

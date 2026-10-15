@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def connect(path: str | None = None) -> sqlite3.Connection:
@@ -32,7 +32,8 @@ def connect(path: str | None = None) -> sqlite3.Connection:
             created_at TEXT NOT NULL,
             reviewer TEXT NOT NULL, action TEXT NOT NULL,
             final_category TEXT, final_priority TEXT, final_reply TEXT,
-            ai_category TEXT, ai_priority TEXT   -- kept to measure AI accuracy
+            ai_category TEXT, ai_priority TEXT,  -- kept to measure AI accuracy
+            ai_reply TEXT
         );
         """
     )
@@ -40,7 +41,7 @@ def connect(path: str | None = None) -> sqlite3.Connection:
 
 
 def now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def row_to_ticket(row: sqlite3.Row) -> dict:

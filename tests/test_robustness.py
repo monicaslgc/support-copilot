@@ -1,0 +1,138 @@
+"""Concurrency, security and input-limit behaviour."""
+import threading
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app import main
+from tests.fakes import FakeZendesk
+
+HOOK = {"ticket_id": "1", "subject": "Duplicate charge on invoice", "description": "refund my invoice please"}
+
+
+def run_threads(n, fn):
+    barrier, results = threading.Barrier(n), [None] * n
+
+    def worker(i):
+        barrier.wait()  # release all threads at the same instant
+        results[i] = fn(i)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    return results
+
+
+def test_simultaneous_reviews_exactly_one_wins():
+    fz = FakeZendesk()
+    fz.seed(1)
+    main.systems["zendesk"] = fz.make()
+    tid = TestClient(main.app).post("/webhooks/zendesk", json=HOOK).json()["id"]
+
+    codes = run_threads(8, lambda i: TestClient(main.app).post(
+        f"/tickets/{tid}/review", json={"action": "approved", "reviewer": f"r{i}", "edited_reply": f"reply {i}"}
+    ).status_code)
+
+    assert sorted(codes) == [200] + [409] * 7
+    assert len(fz.public(1)) == 1                                            # the customer got ONE reply
+    assert main.conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
+
+
+def test_simultaneous_identical_webhooks_create_one_ticket_and_one_note():
+    fz = FakeZendesk()
+    fz.seed(1)
+    main.systems["zendesk"] = fz.make()
+
+    results = run_threads(8, lambda i: TestClient(main.app).post("/webhooks/zendesk", json=HOOK))
+
+    assert all(r.status_code == 201 for r in results)                        # no 500 from a unique-constraint race
+    assert len({r.json()["id"] for r in results}) == 1
+    assert sum(1 for r in results if r.json().get("duplicate")) == 7
+    assert main.conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 1
+    assert len(fz.internal(1)) == 1
+
+
+def test_duplicate_detected_after_triage_does_not_push_twice(monkeypatch):
+    """Deterministic version of the race: an identical webhook completes while we are still triaging."""
+    fz = FakeZendesk()
+    fz.seed(1)
+    main.systems["zendesk"] = fz.make()
+    real_suggest = main._suggest
+
+    def suggest_then_lose_the_race(t):
+        s = real_suggest(t)
+        main._store(t, s, "zendesk", "1")      # the other delivery wins here
+        return s
+
+    monkeypatch.setattr(main, "_suggest", suggest_then_lose_the_race)
+    r = TestClient(main.app).post("/webhooks/zendesk", json=HOOK)
+    assert r.status_code == 201 and r.json().get("duplicate") is True
+    assert fz.requests == []                    # the loser must not write to the ticket system
+
+
+def test_review_action_must_be_approved_or_rejected():
+    c = TestClient(main.app)
+    tid = c.post("/tickets", json={"subject": "Duplicate charge", "body": "refund my invoice"}).json()["id"]
+    for bad in ("pending_review", "maybe", ""):
+        assert c.post(f"/tickets/{tid}/review", json={"action": bad, "reviewer": "m"}).status_code == 422
+    assert c.get(f"/tickets/{tid}").json()["status"] == "pending_review"
+
+
+# ---------------- API key ----------------
+@pytest.fixture
+def secured(monkeypatch):
+    monkeypatch.setenv("API_KEY", "s3cret-key")
+    return TestClient(main.app)
+
+
+PROTECTED = [("get", "/tickets"), ("get", "/tickets/1"), ("get", "/metrics"), ("get", "/outbox"),
+             ("post", "/tickets"), ("post", "/tickets/1/review")]
+
+
+@pytest.mark.parametrize("method,path", PROTECTED)
+def test_api_requires_key_when_configured(secured, method, path):
+    assert getattr(secured, method)(path).status_code == 401
+    assert getattr(secured, method)(path, headers={"X-API-Key": "wrong"}).status_code == 401
+    assert getattr(secured, method)(path, headers={"X-API-Key": "s3cret-key"}).status_code != 401
+
+
+def test_key_unlocks_the_whole_flow(secured):
+    h = {"X-API-Key": "s3cret-key"}
+    new = {"subject": "Duplicate charge", "body": "refund please"}
+    tid = secured.post("/tickets", json=new, headers=h).json()["id"]
+    ok = secured.post(f"/tickets/{tid}/review", json={"action": "approved", "reviewer": "m"}, headers=h)
+    assert ok.status_code == 200
+    assert secured.get("/metrics", headers=h).json()["reviewed"] == 1
+
+
+def test_webhooks_and_health_do_not_use_the_api_key(secured):
+    assert secured.get("/health").status_code == 200
+    assert secured.post("/webhooks/zendesk", json=HOOK).status_code == 201   # authenticated by its own signature
+
+
+def test_api_is_open_when_no_key_configured():
+    c = TestClient(main.app)
+    assert c.get("/tickets").status_code == 200 and c.get("/outbox").status_code == 200
+
+
+def test_health_reports_config_without_leaking_secrets(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret")
+    monkeypatch.setenv("API_KEY", "other-secret")
+    body = TestClient(main.app).get("/health").json()
+    assert body["llm"] is True and body["ticket_systems"] == {"zendesk": False, "zammad": False}
+    assert "secret" not in str(body)
+
+
+# ---------------- limits ----------------
+def test_oversized_webhook_is_rejected():
+    big = b'{"ticket_id": "1", "subject": "x", "description": "' + b"a" * 1_100_000 + b'"}'
+    assert TestClient(main.app).post("/webhooks/zendesk", content=big).status_code == 413
+
+
+def test_list_limit_and_validation():
+    c = TestClient(main.app)
+    for i in range(3):
+        c.post("/tickets", json={"subject": f"Duplicate charge {i}", "body": "refund my invoice"})
+    assert len(c.get("/tickets", params={"limit": 2}).json()) == 2
+    assert c.get("/tickets", params={"limit": 0}).status_code == 422
+    assert c.get("/outbox", params={"limit": 9999}).status_code == 422

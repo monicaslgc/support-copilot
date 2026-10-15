@@ -1,15 +1,16 @@
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 
-class Priority(str, Enum):
+class Priority(StrEnum):
     P1 = "P1"  # critical: outage, data loss, security
     P2 = "P2"  # high: major feature broken, no workaround
     P3 = "P3"  # medium: partial issue, workaround exists
     P4 = "P4"  # low: question, how-to, feature request
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     BUG = "bug"
     BILLING = "billing"
     ACCESS = "access"
@@ -18,8 +19,15 @@ class Category(str, Enum):
     OTHER = "other"
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class Decision(StrEnum):
+    """What a human can decide. Deliberately has no 'pending' value."""
+
     APPROVED = "approved"
     REJECTED = "rejected"
 
@@ -46,7 +54,7 @@ class Suggestion(BaseModel):
 
 
 class Review(BaseModel):
-    action: Status  # approved | rejected
+    action: Decision
     reviewer: str
     edited_reply: str | None = None
     final_priority: Priority | None = None

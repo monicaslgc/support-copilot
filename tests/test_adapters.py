@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main
 from app.models import Category, Priority
-from app.ticketsystems import WebhookError, ZammadSystem, ZendeskSystem
+from app.ticketsystems import WebhookError, ZammadSystem
 from app.ticketsystems.zendesk import verify_signature as zd_verify
 from tests.fakes import FakeZammad, FakeZendesk
 
@@ -25,7 +25,8 @@ def bodies(fake):
 
 # ---------------- Zendesk ----------------
 def test_zendesk_wire_format():
-    fz = FakeZendesk(); fz.seed(4711)
+    fz = FakeZendesk()
+    fz.seed(4711)
     main.systems["zendesk"] = fz.make()
     TestClient(main.app).post("/webhooks/zendesk", json=ZD)
     req, t = fz.requests[0], bodies(fz)[0]["ticket"]
@@ -36,7 +37,8 @@ def test_zendesk_wire_format():
 
 
 def test_zendesk_public_reply_sets_status_pending_and_type():
-    fz = FakeZendesk(); fz.seed(4711)
+    fz = FakeZendesk()
+    fz.seed(4711)
     main.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     tid = c.post("/webhooks/zendesk", json=ZD).json()["id"]
@@ -54,8 +56,10 @@ def test_zendesk_signature(monkeypatch):
     sig = base64.b64encode(hmac.new(b"s3cret", ts.encode() + raw, hashlib.sha256).digest()).decode()
     h = {"content-type": "application/json", "X-Zendesk-Webhook-Signature-Timestamp": ts}
     assert c.post("/webhooks/zendesk", content=raw, headers=h).status_code == 401
-    assert c.post("/webhooks/zendesk", content=raw, headers={**h, "X-Zendesk-Webhook-Signature": "bad"}).status_code == 401
-    assert c.post("/webhooks/zendesk", content=raw, headers={**h, "X-Zendesk-Webhook-Signature": sig}).status_code == 201
+    bad = {**h, "X-Zendesk-Webhook-Signature": "bad"}
+    good = {**h, "X-Zendesk-Webhook-Signature": sig}
+    assert c.post("/webhooks/zendesk", content=raw, headers=bad).status_code == 401
+    assert c.post("/webhooks/zendesk", content=raw, headers=good).status_code == 201
     assert zd_verify("s3cret", ts, raw, sig)
 
 
@@ -65,7 +69,8 @@ def test_zendesk_bad_payload():
 
 # ---------------- Zammad ----------------
 def test_zammad_wire_format_internal_note():
-    fz = FakeZammad(); fz.seed(55, tags=["vip"])
+    fz = FakeZammad()
+    fz.seed(55, tags=["vip"])
     main.systems["zammad"] = fz.make()
     r = TestClient(main.app).post("/webhooks/zammad", json=ZM)
     assert r.status_code == 201
@@ -81,7 +86,8 @@ def test_zammad_wire_format_internal_note():
 
 
 def test_zammad_public_reply_is_not_internal():
-    fz = FakeZammad(); fz.seed(55)
+    fz = FakeZammad()
+    fz.seed(55)
     main.systems["zammad"] = fz.make()
     c = TestClient(main.app)
     tid = c.post("/webhooks/zammad", json=ZM).json()["id"]
