@@ -1,20 +1,22 @@
 import os
 
 os.environ.pop("ANTHROPIC_API_KEY", None)   # tests are offline, rules mode
-os.environ.pop("ZENDESK_WEBHOOK_SECRET", None)
+for var in ("ZENDESK_WEBHOOK_SECRET", "ZAMMAD_WEBHOOK_SECRET"):
+    os.environ.pop(var, None)
 os.environ["TRIAGE_DB"] = ":memory:"
 
 import pytest
 
 import app.main as main
 from app.db import connect
-from app.zendesk import ZendeskClient
+from app.ticketsystems import build_systems
 
 
 @pytest.fixture(autouse=True)
-def isolated_state():
-    """Every test gets a fresh DB and a dry-run Zendesk client; nothing leaks between tests."""
+def isolated_state(monkeypatch):
+    """Every test gets a fresh DB and dry-run adapters (no credentials); nothing leaks between tests."""
+    for var in ("ZENDESK_SUBDOMAIN", "ZENDESK_EMAIL", "ZENDESK_API_TOKEN", "ZAMMAD_URL", "ZAMMAD_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
     main.conn = connect(":memory:")
-    main.zendesk = ZendeskClient()
+    main.systems = build_systems()
     yield
-    main.zendesk = ZendeskClient()

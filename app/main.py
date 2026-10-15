@@ -1,20 +1,19 @@
 import json
-import os
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
 from .classifier import classify
 from .db import connect, now, row_to_ticket
 from .drafting import draft_reply
 from .kb import KnowledgeBase
 from .models import Category, Priority, Review, Status, Suggestion, TicketIn
-from .zendesk import PRIORITY_MAP, TYPE_MAP, ZendeskClient, verify_signature
+from .ticketsystems import TicketSystem, WebhookError, build_systems
 
-app = FastAPI(title="Ticket Triage (human-in-the-loop, Zendesk-ready)")
+app = FastAPI(title="support-copilot (human-in-the-loop ticket triage)")
 kb = KnowledgeBase()
 conn = connect()
-zendesk = ZendeskClient.from_env()
+systems: dict[str, TicketSystem] = build_systems()
 
 
 def _suggest(t: TicketIn) -> Suggestion:
@@ -27,26 +26,26 @@ def _suggest(t: TicketIn) -> Suggestion:
     )
 
 
-def _store(t: TicketIn, s: Suggestion, zendesk_ticket_id: int | None = None) -> int:
+def _store(t: TicketIn, s: Suggestion, system: str | None = None, external_id: str | None = None) -> int:
     cur = conn.execute(
-        "INSERT INTO tickets (created_at, subject, body, customer, suggestion, zendesk_ticket_id)"
-        " VALUES (?,?,?,?,?,?)",
-        (now(), t.subject, t.body, t.customer, s.model_dump_json(), zendesk_ticket_id),
+        "INSERT INTO tickets (created_at, subject, body, customer, suggestion, system, external_id)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (now(), t.subject, t.body, t.customer, s.model_dump_json(), system, external_id),
     )
     conn.commit()
     return cur.lastrowid
 
 
-def _push(zd_id: int, kind: str, **kwargs):
-    """Call Zendesk and log it. A Zendesk outage must never lose our triage or the human's decision."""
+def _push(system: TicketSystem, ext_id: str, kind: str, call, *args, **kwargs):
+    """Call the ticket system and log it. An outage there must never lose our triage or the human's decision."""
     try:
-        res = zendesk.update_ticket(zd_id, **kwargs)
-        mode, payload, err = res["mode"], res["payload"], None
+        res = call(ext_id, *args, **kwargs)
+        mode, payload, err = res["mode"], {"requests": res["requests"]}, None
     except Exception as e:
-        mode, payload, err = "error", {"kwargs": kwargs}, str(e)
+        mode, payload, err = "error", {"kind": kind}, str(e)
     conn.execute(
-        "INSERT INTO outbox (created_at, zendesk_ticket_id, kind, mode, payload, error) VALUES (?,?,?,?,?,?)",
-        (now(), zd_id, kind, mode, json.dumps(payload), err),
+        "INSERT INTO outbox (created_at, system, external_id, kind, mode, payload, error) VALUES (?,?,?,?,?,?,?)",
+        (now(), system.name, ext_id, kind, mode, json.dumps(payload), err),
     )
     conn.commit()
     return mode
@@ -70,50 +69,35 @@ def create_ticket(t: TicketIn):
     return {"id": _store(t, s), "status": Status.PENDING_REVIEW, "suggestion": s}
 
 
-class ZendeskWebhook(BaseModel):
-    ticket_id: int
-    subject: str
-    description: str
-    requester: str = "unknown"
-
-
-@app.post("/webhooks/zendesk", status_code=201)
-async def zendesk_webhook(request: Request):
-    """Zendesk webhook target (fire it from a trigger on 'ticket created').
-
-    Body template (Admin Center > Webhooks):
-      {"ticket_id":"{{ticket.id}}","subject":"{{ticket.title}}",
-       "description":"{{ticket.description}}","requester":"{{ticket.requester.name}}"}
-    """
+@app.post("/webhooks/{system_name}", status_code=201)
+async def ticket_system_webhook(system_name: str, request: Request):
+    """Inbound webhook from a ticket system (zendesk, zammad). Configure it on 'ticket created'."""
+    system = systems.get(system_name)
+    if not system:
+        raise HTTPException(404, f"unknown ticket system '{system_name}'")
     raw = await request.body()
-    secret = os.getenv("ZENDESK_WEBHOOK_SECRET")
-    if secret and not verify_signature(
-        secret,
-        request.headers.get("X-Zendesk-Webhook-Signature-Timestamp", ""),
-        raw,
-        request.headers.get("X-Zendesk-Webhook-Signature", ""),
-    ):
+    if not system.verify_webhook(request.headers, raw):
         raise HTTPException(401, "invalid webhook signature")
     try:
-        w = ZendeskWebhook.model_validate_json(raw)
-        t = TicketIn(subject=w.subject, body=w.description, customer=w.requester)
+        inbound = system.parse_webhook(raw)
+        t = TicketIn(subject=inbound.subject, body=inbound.body, customer=inbound.requester)
+    except WebhookError as e:
+        raise HTTPException(422, str(e))
     except ValidationError as e:
         raise HTTPException(422, json.loads(e.json()))
 
-    # Zendesk retries failed deliveries: make this idempotent per Zendesk ticket.
-    row = conn.execute("SELECT id FROM tickets WHERE zendesk_ticket_id = ?", (w.ticket_id,)).fetchone()
+    # Ticket systems retry failed deliveries: make this idempotent per (system, external ticket).
+    row = conn.execute("SELECT id FROM tickets WHERE system = ? AND external_id = ?",
+                       (system.name, inbound.external_id)).fetchone()
     if row:
         return {"id": row["id"], "duplicate": True}
 
     s = _suggest(t)
-    tid = _store(t, s, w.ticket_id)
-    # Internal note only (public=False): the customer sees nothing until a human approves.
-    _push(
-        w.ticket_id, "triage_note",
-        comment=_internal_note(s), public=False,
-        priority=PRIORITY_MAP[s.triage.priority], ticket_type=TYPE_MAP[s.triage.category],
-        tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}"],
-    )
+    tid = _store(t, s, system.name, inbound.external_id)
+    # Internal note only: the customer sees nothing until a human approves.
+    _push(system, inbound.external_id, "triage_note", system.post_internal_note, _internal_note(s),
+          priority=s.triage.priority, category=s.triage.category,
+          tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}"])
     return {"id": tid, "status": Status.PENDING_REVIEW, "suggestion": s}
 
 
@@ -137,7 +121,7 @@ def get_ticket(ticket_id: int):
 
 @app.post("/tickets/{ticket_id}/review")
 def review_ticket(ticket_id: int, r: Review):
-    """Human decision. Approved replies go to the customer (Zendesk tickets) as a public comment."""
+    """Human decision. Approved replies go to the customer (tickets from a ticket system) as a public reply."""
     row = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
     if not row:
         raise HTTPException(404, "ticket not found")
@@ -159,21 +143,16 @@ def review_ticket(ticket_id: int, r: Review):
     conn.execute("UPDATE tickets SET status = ? WHERE id = ?", (r.action.value, ticket_id))
     conn.commit()
 
-    zd_id = row["zendesk_ticket_id"]
+    system = systems.get(row["system"]) if row["system"] else None
     sync = None
-    if zd_id:
+    if system:
+        ext = row["external_id"]
         if r.action is Status.APPROVED:
-            sync = _push(
-                zd_id, "public_reply", comment=final_reply, public=True, status="pending",
-                priority=PRIORITY_MAP[Priority(final_pri)], ticket_type=TYPE_MAP[Category(final_cat)],
-            )
+            sync = _push(system, ext, "public_reply", system.post_public_reply, final_reply,
+                         priority=Priority(final_pri), category=Category(final_cat))
         else:
-            sync = _push(
-                zd_id, "rejection_note", public=False,
-                comment=f"[AI triage] Suggestion rejected by {r.reviewer}. Handle manually.",
-                tags=["ai_rejected"],
-            )
-    return {"id": ticket_id, "status": r.action, "zendesk_sync": sync}
+            sync = _push(system, ext, "rejection_note", system.post_rejection, r.reviewer)
+    return {"id": ticket_id, "status": r.action, "sync": sync}
 
 
 @app.get("/metrics")
@@ -200,6 +179,6 @@ def metrics():
 
 @app.get("/outbox")
 def outbox(limit: int = 50):
-    """Audit log of calls to Zendesk (sent / dry_run / error)."""
+    """Audit log of calls to ticket systems (sent / dry_run / error)."""
     rows = conn.execute("SELECT * FROM outbox ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     return [{**dict(r), "payload": json.loads(r["payload"])} for r in rows]

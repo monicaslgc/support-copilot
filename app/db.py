@@ -15,12 +15,13 @@ def connect(path: str | None = None) -> sqlite3.Connection:
             subject TEXT NOT NULL, body TEXT NOT NULL, customer TEXT NOT NULL,
             suggestion TEXT NOT NULL,           -- JSON: triage + articles + draft
             status TEXT NOT NULL DEFAULT 'pending_review',
-            zendesk_ticket_id INTEGER UNIQUE    -- set when the ticket came from Zendesk
+            system TEXT, external_id TEXT,      -- set when the ticket came from a ticket system
+            UNIQUE (system, external_id)
         );
-        CREATE TABLE IF NOT EXISTS outbox (     -- every call we make to Zendesk, for audit/debug
+        CREATE TABLE IF NOT EXISTS outbox (     -- every call we make to a ticket system, for audit/debug
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TEXT NOT NULL,
-            zendesk_ticket_id INTEGER NOT NULL,
+            system TEXT NOT NULL, external_id TEXT NOT NULL,
             kind TEXT NOT NULL,                 -- triage_note | public_reply | rejection_note
             mode TEXT NOT NULL,                 -- sent | dry_run | error
             payload TEXT NOT NULL, error TEXT
@@ -35,10 +36,6 @@ def connect(path: str | None = None) -> sqlite3.Connection:
         );
         """
     )
-    cols = [r["name"] for r in conn.execute("PRAGMA table_info(tickets)")]
-    if "zendesk_ticket_id" not in cols:  # DB created before the Zendesk adapter existed
-        conn.execute("ALTER TABLE tickets ADD COLUMN zendesk_ticket_id INTEGER")
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_zd ON tickets(zendesk_ticket_id)")
     return conn
 
 
