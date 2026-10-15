@@ -1,0 +1,8 @@
+[
+  {"subject": "Platform is down", "body": "Nobody on my team can access anything, total outage since 9am.", "customer": "Ana"},
+  {"subject": "Não consigo fazer login", "body": "Esqueci a palavra-passe e o link de reset não chega.", "customer": "Rui"},
+  {"subject": "Duplicate charge on invoice", "body": "I was charged twice this month, I want a refund.", "customer": "Sam"},
+  {"subject": "How to export a report?", "body": "How do I export the monthly report to CSV?", "customer": "Joana"},
+  {"subject": "Feature suggestion", "body": "It would be nice if you could add dark mode.", "customer": "Leo"},
+  {"subject": "Error when saving contact", "body": "I get an error and the page crashes when saving a contact.", "customer": "Marta"}
+]
