@@ -4,7 +4,7 @@ Zammad is open source and self-hostable, so this is the adapter that can be test
 against a real instance without a paid account.
 
 Defaults assumed: priorities 1 low / 2 normal / 3 high (Zammad has no "urgent" out of
-the box, so P1 and P2 both map to high; the P1/P2 distinction is kept in the tags).
+the box, so P1 and P2 both map to high; the P1/P2 distinction is kept in the internal note).
 """
 import hashlib
 import hmac

@@ -9,6 +9,7 @@ import math
 import os
 from collections import Counter
 from collections.abc import Iterable, Mapping
+from typing import Any
 
 
 def wilson_lower(successes: int, n: int, z: float = 1.96) -> float:
@@ -41,7 +42,7 @@ def breakdown(rows: Iterable[Mapping]) -> dict:
     """
     cats: dict[str, Counter] = {}
     reasons: Counter = Counter()
-    total = Counter()
+    total: Counter = Counter()
     for r in rows:
         c = cats.setdefault(r["ai_category"], Counter())
         approved = r["action"] == "approved"
@@ -60,7 +61,7 @@ def breakdown(rows: Iterable[Mapping]) -> dict:
         total["overrides_with_reason"] += override and bool(given)
         reasons.update(given)
 
-    by_category = []
+    by_category: list[dict[str, Any]] = []
     for name, c in cats.items():
         lower = wilson_lower(c["clean"], c["reviewed"])
         by_category.append({

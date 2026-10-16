@@ -21,7 +21,7 @@ Guarantees, enforced by the same end-to-end tests for every system:
 |---|---|---|
 | Auth | `Authorization: Token token=...` | Basic `email/token:api_token` |
 | Webhook signature | `X-Hub-Signature: sha1=<HMAC-SHA1>` | `X-Zendesk-Webhook-Signature` (HMAC-SHA256 of timestamp + body) |
-| Priority | P1, P2 -> high; P3 -> normal; P4 -> low (no "urgent" by default; P1 vs P2 stays in the tags) | urgent / high / normal / low |
+| Priority | P1, P2 -> high; P3 -> normal; P4 -> low (no "urgent" by default; P1 vs P2 stays in the internal note) | urgent / high / normal / low |
 | Internal vs public | `ticket_articles` with `internal: true/false` | comment `public: false/true` |
 | Tags | `POST /tags/add` (additive) | `additional_tags` (additive; `tags` would overwrite) |
 

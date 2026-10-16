@@ -10,6 +10,7 @@ These are the routes of `create_router(copilot)` (see the [embedding guide](embe
 |---|---|---|
 | GET | `/` | The review queue page (no data of its own: it calls the API below) |
 | POST | `/tickets` | Triage a ticket and draft a reply (stays `pending_review`) |
+| GET | `/tickets/{id}` | One ticket with its triage, draft, history, incident and review |
 | GET | `/tickets?status=` | Review queue, most urgent first. Reviewed tickets include a `review` with the human's decision and the reply that was sent |
 | GET | `/clusters` | Groups of tickets about the same issue that still have something to review, possible incidents first |
 | POST | `/clusters/{id}/review` | One decision for every pending ticket of a possible incident (409 for other groups) |

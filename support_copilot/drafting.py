@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 from . import llm
 from .guardrails import explain, find_commitments, hard_commitments, redact_text
@@ -17,7 +18,7 @@ SYSTEM = (
 
 # Fixed wording for the fallback template, so a Portuguese customer does not get an English reply
 # just because the model was unavailable. Unknown languages fall back to English.
-_WORDS = {
+_WORDS: dict[str, dict[str, Any]] = {
     "en": {"hi": "Hi {name},", "thanks": "Thanks for reaching out.", "sorry": "We're sorry for the trouble.",
            "help": "These articles may help:", "later": "A specialist from our team will look into this and get "
            "back to you.", "urgent": "We've flagged this as high priority.",

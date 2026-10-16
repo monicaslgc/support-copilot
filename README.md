@@ -77,15 +77,15 @@ Twelve [user stories](docs/user-stories.md) (support agents, support leads, admi
 
 ## How it is validated
 
-- **451 tests** on Python 3.11, 3.12 and 3.13, with `ruff`, in CI, plus a job that builds the wheel and uses it in a clean environment. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's colour tokens, contrast ratios and approval controls.
+- **456 tests** on Python 3.11, 3.12 and 3.13, with `ruff`, in CI, plus a job that builds the wheel and uses it in a clean environment. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's colour tokens, contrast ratios and approval controls.
 - **User stories are executable:** each of the twelve stories has an acceptance test, and a test fails if a story, its test or its demo scenario drifts apart.
-- **Mutation-checked, driven in a browser, measured:** I broke the code on purpose in dozens of ways and made sure a test failed each time (several did not at first, and each got a new test). The review page was driven in Chromium by hand, and saving a ticket stays at about 6.5 ms from 100 to 2000 tickets in an hour. [Engineering notes](docs/engineering.md).
+- **Mutation-checked, driven in a browser, measured:** I broke the code on purpose in dozens of ways and made sure a test failed each time (several did not at first, and each got a new test). The review page was driven in Chromium by hand, and saving a ticket takes about 3 to 4 ms and stays flat from 500 to 2000 tickets in an hour (`python scripts/benchmark.py`). [Engineering notes](docs/engineering.md).
 
 ## What is verified
 
 | Area | State |
 |---|---|
-| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (451 tests, synthetic data) |
+| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (456 tests, synthetic data) |
 | Library API and FastAPI router (`Copilot`, `create_router`) | **Implemented and tested offline;** CI installs the built wheel in a clean environment and runs the library example |
 | Approving by tag in the helpdesk, your own tags and names | **Prototyped:** tested against stateful fakes of Zammad and Zendesk, including the webhook payloads that carry the tags and the acting agent |
 | Zammad and Zendesk adapters | **Prototyped:** tested against stateful fakes only, never a live instance |
@@ -122,7 +122,7 @@ pip install -e ".[dev]"   # or: make install
 uvicorn support_copilot.main:app --reload          # review page at http://127.0.0.1:8000/
 python scripts/seed_demo.py            # in another terminal: loads sample tickets
 python scripts/demo.py all             # plays the user stories against the server and checks each outcome
-pytest                                 # 451 tests, offline
+pytest                                 # 456 tests, offline
 ```
 
 `scripts/demo.py list` shows the scenarios. [`examples/`](examples/README.md) has ready-made Zammad and Zendesk payloads and the `curl` commands to send them, including signed ones and the approve-by-tag update. To use Claude, set `ANTHROPIC_API_KEY` (the model is `TRIAGE_MODEL`). To connect Zammad or Zendesk, see [integrations](docs/integrations.md). Every setting is in [API and configuration](docs/api.md).

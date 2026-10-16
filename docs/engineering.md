@@ -4,7 +4,7 @@ How it is tested and how it behaves as the queue grows. Back to the [README](../
 
 ## Tests
 
-451 tests, run on Python 3.11, 3.12 and 3.13 in CI together with `ruff`, plus a job that installs the built wheel in a clean environment and runs the library example. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
+456 tests, run on Python 3.11, 3.12 and 3.13 in CI together with `ruff`, plus a job that installs the built wheel in a clean environment and runs the library example. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
@@ -18,7 +18,9 @@ I checked that the tests catch real bugs by breaking the code on purpose, 20+ wa
 
 ## Performance
 
-Measured in-process with 2000 tickets in the same hour (no network, one SQLite connection, rules mode): saving a ticket takes about 6.5 ms whether the queue holds 100 or 2000 tickets, and listing the queue about 17 ms. The first version scanned every recent ticket to link related ones and went from 6 ms to 34 ms over the same run, while holding the lock that serialises all database access. Now the linking rules use indexes (one row by topic, one by customer) and only compare near-identical text among the latest 200 tickets, and the queue is sorted and limited in SQL. With a real model the call to it dominates, not the database.
+`python scripts/benchmark.py` measures it: 2000 tickets in the same hour, in process (no network, no model), one SQLite connection, rules mode. On a 4-CPU machine with Python 3.13 and SQLite 3.45 it gave, over three runs, a median of about 1 ms to save a ticket while the queue holds the first 100, and about 3 to 4 ms from 500 tickets up to 2000: it rises while the queue fills the one-hour window and then stays flat, instead of growing with the queue. Listing the 100 most urgent tickets took about 3 to 5 ms and the 500 most urgent about 13 to 21 ms. Your machine will differ, so the script prints its versions with its numbers.
+
+Why it stays flat: the rules that link related tickets look up candidates with indexes (one row by topic, one by customer) and only compare near-identical text among the latest 200 tickets, and the queue is sorted and limited in SQL. The earlier version scanned every recent ticket on each insert while holding the lock that serialises all database access, and `tests/test_scale.py` checks the query plans so that cannot come back. With a real model the call to it dominates, not the database.
 
 A reasonable ceiling for this design is one instance and a few thousand tickets an hour. Beyond that, move to PostgreSQL, run the model calls and ticket-system pushes in a background queue, and make bulk reviews asynchronous: a bulk decision on a big incident currently pushes to the ticket system one ticket at a time inside one request.
 

@@ -17,6 +17,7 @@ jobs:
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev]"
       - run: ruff check .
+      - run: mypy
       - run: pytest -q
 
   # What a user gets from `pip install`: the built wheel, in a clean environment, with only the declared

@@ -7,6 +7,7 @@ import math
 import re
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 KB_DIR = Path(__file__).resolve().parent / "kb"  # a small sample; pass your own folder to KnowledgeBase
 _STOP = set(
@@ -33,7 +34,7 @@ def tokens(text: str) -> list[str]:
 class KnowledgeBase:
     def __init__(self, directory: Path = KB_DIR):
         self.directory = Path(directory)
-        self.docs = []
+        self.docs: list[dict[str, Any]] = []
         for path in sorted(directory.glob("*.md")):
             text = path.read_text(encoding="utf-8")
             title = text.splitlines()[0].lstrip("# ").strip() if text else path.stem
@@ -49,11 +50,11 @@ class KnowledgeBase:
         """Top-k articles. Besides the absolute floor, drop anything scoring under `relative` x the best match,
         so one clear hit is not listed next to weak coincidental ones."""
         q = Counter(_tokens(query))
-        results = []
+        results: list[dict[str, Any]] = []
         for d in self.docs:
             score = sum(q[t] * self.idf.get(t, 0) * d["tf"][t] for t in q if t in d["tf"])
             norm = math.sqrt(sum((v * self.idf.get(t, 0)) ** 2 for t, v in d["tf"].items())) or 1
-            score /= norm
+            score = score / norm
             if score >= min_score:
                 results.append({"id": d["id"], "title": d["title"], "score": round(score, 3), "text": d["text"]})
         results = sorted(results, key=lambda r: r["score"], reverse=True)

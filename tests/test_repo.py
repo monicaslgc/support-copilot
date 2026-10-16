@@ -27,6 +27,10 @@ def test_the_core_has_light_dependencies_and_heavier_ones_are_extras():
     assert not (ROOT / "requirements.txt").exists()  # one source of truth: pyproject.toml
 
 
+def test_ci_runs_the_type_checker():
+    assert "- run: mypy" in (ROOT / ".github/workflows/tests.yml").read_text()
+
+
 def test_ci_installs_the_dev_extra_and_has_least_privilege():
     ci = (ROOT / ".github/workflows/tests.yml").read_text()
     assert ".[dev]" in ci
@@ -81,3 +85,8 @@ def test_ci_also_checks_the_built_wheel_in_a_clean_environment():
     ci = (ROOT / ".github/workflows/tests.yml").read_text()
     assert "python -m build --wheel" in ci and "library_usage.py" in ci and "3.13" in ci
     assert "support_copilot.doctor" in ci and "support_copilot.evaluate" in ci   # the commands the guide gives
+
+
+def test_the_package_version_is_the_one_in_pyproject():
+    import support_copilot
+    assert support_copilot.__version__ == tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]

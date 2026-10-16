@@ -153,3 +153,16 @@ def test_the_commands_in_the_guide_exist():
         assert f"python -m {module}" in guide
         assert importlib.util.find_spec(module) is not None
     assert "--live" in guide and "--model" in guide and "--rules" in guide
+
+
+def test_the_api_table_lists_exactly_the_routes_the_server_has():
+    from support_copilot.main import app
+
+    def shape(path: str) -> str:  # "/tickets/{ticket_id}?x=1" and "/tickets/{id}" are the same route
+        return re.sub(r"\{[^}]+\}", "{}", re.sub(r"\?.*", "", path))
+
+    table = (ROOT / "docs" / "api.md").read_text(encoding="utf-8")
+    documented = {(m, shape(p)) for m, p in re.findall(r"^\| (GET|POST) \| `([^`]+)` \|", table, re.M)}
+    documented -= {("GET", "/")}  # the review page is not an API route
+    real = {(m.upper(), shape(p)) for p, methods in app.openapi()["paths"].items() for m in methods}
+    assert documented == real, f"only in the doc: {documented - real}; only in the server: {real - documented}"

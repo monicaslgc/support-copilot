@@ -22,4 +22,4 @@ The full list of known gaps is in [limitations](docs/limitations.md).
 
 ## Reporting a vulnerability
 
-Please open a private security advisory on the GitHub repository (Security tab, "Report a vulnerability") rather than a public issue.
+Please report it privately rather than in a public issue: use "Report a vulnerability" on the repository's Security tab if it is enabled; if it is not, open an issue that only asks for a private way to reach the author, without any details.

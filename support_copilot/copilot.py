@@ -163,7 +163,7 @@ class Copilot:
         """
         cols = "id, cluster_id, customer, topic, category, subject, body, created_at"
         cutoff = (new.created_at - clusters.window()).isoformat(timespec="seconds")
-        found = []
+        found: list[tuple[str, tuple]] = []
         if new.topic is not None:
             found.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? AND topic = ? AND category = ?"
                           " ORDER BY created_at, id LIMIT 1", (cutoff, new.topic, new.category)))
@@ -268,7 +268,8 @@ class Copilot:
         """Add `cluster` (null, or the stats of the group of tickets about the same issue) to each ticket."""
         stats = self.cluster_stats([t.get("cluster_id") for t in tickets])
         for t in tickets:
-            t["cluster"] = stats.get(t.get("cluster_id"))
+            cid = t.get("cluster_id")
+            t["cluster"] = stats.get(cid) if cid is not None else None
         return tickets
 
     def customer_history(self, customer: str, before_id: int, limit: int = 5) -> dict:
@@ -316,7 +317,8 @@ class Copilot:
     def _context(self, tid: int) -> dict:
         """What we know about how this ticket relates to others, for the internal note and tags."""
         row = self.fetch_one("SELECT cluster_id, duplicate_of, system, customer FROM tickets WHERE id = ?", (tid,))
-        cluster = self.cluster_stats([row["cluster_id"]]).get(row["cluster_id"]) if row and row["cluster_id"] else None
+        cid = row["cluster_id"] if row else None
+        cluster = self.cluster_stats([cid]).get(cid) if cid else None
         duplicate = None
         if row and row["duplicate_of"]:
             d = self.fetch_one("SELECT id, system, external_id FROM tickets WHERE id = ?", (row["duplicate_of"],))

@@ -22,8 +22,9 @@ demo:  ## play the user stories against a running server
 test:  ## run the tests (offline)
 	pytest -q
 
-lint:  ## style and bug checks
+lint:  ## style, bug and type checks
 	ruff check .
+	mypy
 
 check: lint test  ## what CI runs
 

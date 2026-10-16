@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 def connect(path: str | None = None) -> sqlite3.Connection:
     """Open (and create or upgrade) the database. Without a path: TRIAGE_DB, else ./triage.db."""
-    return init(sqlite3.connect(path or os.getenv("TRIAGE_DB", "triage.db"), check_same_thread=False))
+    return init(sqlite3.connect(path or os.environ.get("TRIAGE_DB") or "triage.db", check_same_thread=False))
 
 
 def init(conn: sqlite3.Connection) -> sqlite3.Connection:
@@ -69,10 +69,11 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
             triage = {}
         conn.execute("UPDATE tickets SET category = ?, priority = ? WHERE id = ?",
                      (triage.get("category", "other"), triage.get("priority", "P3"), row["id"]))
-    for name, cols in (("cluster", "cluster_id"), ("created", "created_at"), ("topic", "topic, category, created_at"),
-                       ("customer", "lower(customer), category, created_at"),
-                       ("queue", "status, priority, created_at, id")):
-        conn.execute(f"CREATE INDEX IF NOT EXISTS ix_tickets_{name} ON tickets({cols})")
+    for index, columns in (("cluster", "cluster_id"), ("created", "created_at"),
+                           ("topic", "topic, category, created_at"),
+                           ("customer", "lower(customer), category, created_at"),
+                           ("queue", "status, priority, created_at, id")):
+        conn.execute(f"CREATE INDEX IF NOT EXISTS ix_tickets_{index} ON tickets({columns})")
     conn.commit()
 
 
