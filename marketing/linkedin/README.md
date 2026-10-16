@@ -1,27 +1,25 @@
 # LinkedIn package: support-copilot
 
-Ready for your review. Nothing here has been published.
+Ready for your review. Nothing here has been published. Built from the LinkedIn Media Kit: official palette, DM Serif Display, Inter and JetBrains Mono, post structure and voice rules (no dashes or arrows, few hashtags, nothing invented).
 
 | File | What it is |
 |---|---|
 | [post-en.md](post-en.md) | Recommended post, English |
-| [post-pt-pt.md](post-pt-pt.md) | Optional PT-PT version |
+| [post-pt-pt.md](post-pt-pt.md) | PT-PT version (the kit's default language) |
 | [project-summary.md](project-summary.md) | Short summary for a profile Featured section, a message or a CV line |
 
 ## Images, in order
 
-Upload as a multi-image post (LinkedIn shows the first image in the feed, so it carries the message).
+Upload as a multi-image post. LinkedIn shows the first image in the feed and crops the others to its ratio, so check the preview.
 
 | # | File | Why it is there | Suggested alt text |
 |---|---|---|---|
-| 1 | `docs/social-preview.png` (1280 × 640) | The idea in one line, with a genuine product crop | support-copilot: AI-assisted support, human-approved decisions |
+| 1 | `marketing/linkedin/images/support-copilot-4x5.png` (1080 × 1350) | The message in one image, in the kit's editorial template for resources | AI prepares. A person decides. The eight capabilities of support-copilot and the line: AI proposes, deterministic rules decide, humans approve |
 | 2 | `docs/review-queue.png` | The human decision, clearly separated from the AI's suggestion | The review page with the ticket, the AI's triage and draft, and a separate Your decision panel |
 | 3 | `docs/guardrails.png` | Masking and the promise warning | A reply promising a refund is flagged before approval |
 | 4 | `docs/incident-spike.png` | Product thinking: an outage becomes one incident | Four tickets grouped as a possible incident, answered with one click |
-| 5 | `docs/architecture.png` | Which steps are AI, which are plain rules, where the human sits | Flow from ticket through masking, triage, drafting, checks and human approval to the customer |
+| 5 | `docs/architecture.png` (16:9) | Which steps are AI, which are plain rules, where the human sits | Flow from ticket through masking, triage, drafting, checks and human approval to the customer |
 | 6 (optional) | `docs/insights.png` | The feedback loop, with synthetic demo data | Clean rate per category with a confidence lower bound |
-
-The post is written to work with images 1 to 5. Images 2 and 3 are tall, so check the crop in LinkedIn's preview.
 
 ## Product decisions worth highlighting
 
@@ -34,8 +32,7 @@ The post is written to work with images 1 to 5. Images 2 and 3 are tall, so chec
 
 ## Hashtags
 
-Used in the post: `#ProductManagement #AppliedAI #HumanInTheLoop #ResponsibleAI #CustomerSupport #Automation`
-Alternatives: `#ProductThinking #AIProduct #UX #Python #FastAPI #LLM`. Three to six is plenty.
+Used in the post, from the kit's short list: `#AI #ProductManagement #Automation #OpenSource #BusinessAnalysis`. Add `#AIAgents` only if you want to lean on the agent angle. Few hashtags is the kit's rule.
 
 ## Before posting (manual)
 

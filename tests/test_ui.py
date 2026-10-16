@@ -52,9 +52,9 @@ def test_the_page_is_served():
 def test_it_uses_the_brand_palette_and_typefaces():
     light, _ = light_dark()
     brand = (light["cream"], light["sage"], light["forest"], light["charcoal"])
-    assert brand == ("#F6F2E9", "#A8B29A", "#263C32", "#353832")
+    assert brand == ("#F4F1E8", "#A0B3A0", "#153D32", "#202A27")
     assert (light["bg"], light["ink"], light["accent"]) == (light["cream"], light["charcoal"], light["forest"])
-    for face in ("Inter", "JetBrains Mono", "Georgia"):
+    for face in ("Inter", "JetBrains Mono", "DM Serif Display"):
         assert face in PAGE
 
 

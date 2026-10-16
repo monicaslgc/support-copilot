@@ -7,22 +7,22 @@
 <link rel="icon" href="data:,">
 <style>
 :root {
-  /* Brand: Cream #F6F2E9, Sage #A8B29A, Forest Green #263C32, Charcoal #353832. Rust and ochre are semantic only (warnings). */
-  --cream: #F6F2E9; --sage: #A8B29A; --forest: #263C32; --charcoal: #353832;
-  --bg: var(--cream); --panel: #FCFAF5; --ink: var(--charcoal); --muted: #5E6357; --line: #DAD6C8;
-  --accent: var(--forest); --accent-ink: var(--cream); --ai-bg: #E9EDE1; --ai-line: var(--sage);
+  /* Brand kit: Cream #F4F1E8, Sage #A0B3A0, Dark green #153D32, Charcoal #202A27, Muted green #6F8876 (decorative: too light for small text, so --muted is a darker shade of it). Rust and ochre are semantic only (warnings). */
+  --cream: #F4F1E8; --sage: #A0B3A0; --forest: #153D32; --charcoal: #202A27; --muted-green: #6F8876;
+  --bg: var(--cream); --panel: #FAF8F2; --ink: var(--charcoal); --muted: #4C6354; --line: #D6D9D0;
+  --accent: var(--forest); --accent-ink: var(--cream); --ai-bg: #E3EAE2; --ai-line: var(--sage);
   --ok: var(--forest); --bad: #9B2F22; --bad-bg: #F6E4DA; --warn: #8A5A12; --warn-bg: #F3E8D2;
-  --p1: #9B2F22; --p2: #8A5A12; --p3: var(--forest); --p4: #5E6357; --focus: var(--forest);
-  --serif: Georgia, "Times New Roman", serif;
+  --p1: #9B2F22; --p2: #8A5A12; --p3: var(--forest); --p4: #4C6354; --focus: var(--forest);
+  --serif: "DM Serif Display", "Cormorant Garamond", Georgia, serif;
   --sans: Inter, "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #141A17; --panel: #1B2420; --ink: #E9E6DC; --muted: #A3A99B; --line: #2F3B35;
-    --accent: var(--sage); --accent-ink: #12201A; --ai-bg: #222C26; --ai-line: #4C5A4B;
+    --bg: #121A16; --panel: #19231E; --ink: #F4F1E8; --muted: #A9B8AA; --line: #2B3A32;
+    --accent: var(--sage); --accent-ink: #12201A; --ai-bg: #1F2B25; --ai-line: #4A5E50;
     --ok: var(--sage); --bad: #F0907F; --bad-bg: #2A1D19; --warn: #E0B060; --warn-bg: #2B2518;
-    --p1: #F0907F; --p2: #E0B060; --p3: var(--sage); --p4: #A3A99B; --focus: var(--sage);
+    --p1: #F0907F; --p2: #E0B060; --p3: var(--sage); --p4: #A9B8AA; --focus: var(--sage);
   }
 }
 * { box-sizing: border-box; }

@@ -1,11 +1,11 @@
 # support-copilot
 
 [![tests](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml/badge.svg)](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml)
-![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-263C32)
-![MIT licence](https://img.shields.io/badge/licence-MIT-A8B29A)
-![Status: concept](https://img.shields.io/badge/status-concept%20%2F%20portfolio-353832)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-153D32)
+![MIT licence](https://img.shields.io/badge/licence-MIT-A0B3A0)
+![Status: concept](https://img.shields.io/badge/status-concept%20%2F%20portfolio-202A27)
 
-![Support Copilot — AI can prepare the answer; a person decides what gets sent. The workflow runs from ticket through triage, draft and human review to the customer.](docs/project-cover.svg)
+![support-copilot: AI can prepare the answer; a person decides what gets sent. The workflow runs from ticket through triage, draft and human review to the customer.](docs/project-cover.svg)
 
 **A human-in-the-loop AI copilot for support tickets.** It triages each ticket, finds the right help article, drafts the reply in the customer's language and warns when a draft promises something it shouldn't. **A person approves every message before it reaches the customer**, and the app measures where the AI has earned more trust.
 

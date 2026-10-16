@@ -1,6 +1,9 @@
-/* Brand tokens: Sage #A8B29A, Cream #F6F2E9, Forest Green #263C32, Charcoal #353832. */
-:root { --sage:#A8B29A; --cream:#F6F2E9; --forest:#263C32; --charcoal:#353832; --muted:#5E6357; --line:#CFCBBB; --paper:#FCFAF5;
-  --serif: Georgia, "Times New Roman", serif; --sans: Inter, "DM Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+/* Brand kit: Cream #F4F1E8, Sage #A0B3A0, Dark green #153D32, Charcoal #202A27, Muted green #6F8876.
+   --muted is a darker shade of the muted green so small text keeps AA contrast. */
+:root { --sage:#A0B3A0; --cream:#F4F1E8; --forest:#153D32; --charcoal:#202A27; --muted:#4C6354; --line:#D6D9D0; --panel:#DDE5DC; --paper:#FAF8F2;
+  --serif: "DM Serif Display", "Cormorant Garamond", Georgia, serif; --sans: Inter, "DM Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
 * { box-sizing: border-box; margin: 0; }
 body { background: var(--cream); color: var(--charcoal); font: 400 15px/1.45 var(--sans); }
 .mono { font-family: var(--mono); text-transform: uppercase; letter-spacing: .1em; font-size: 11px; }
+.blobs { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.blobs i { position:absolute; background: var(--sage); border-radius: 50%; }
