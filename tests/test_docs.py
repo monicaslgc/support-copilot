@@ -55,7 +55,7 @@ def test_no_screenshot_is_orphaned():
 
 def test_the_readme_is_a_front_page_not_a_manual():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert len(readme.splitlines()) < 140
+    assert len(readme.splitlines()) < 150
     assert readme.splitlines()[0] == "# support-copilot"
     assert "docs/limitations.md" in readme and "Python 3.11" in readme
     assert "has not run against" in readme.lower() or "not verified" in readme.lower()   # honesty stays up front

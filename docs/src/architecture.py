@@ -11,7 +11,7 @@ from pathlib import Path
 FOREST, CREAM, SAGE, CHAR = "#153D32", "#F4F1E8", "#A0B3A0", "#202A27"
 MUTED, BORDER, STEP, STEPB, LINE, WHITE = "#4C6354", "#D6D9D0", "#DDE5DC", "#A0B3A0", "#153D32", "#FFFFFF"
 W = 1600
-FOOTER = "Concept project · synthetic data · offline tests"
+FOOTER = "Prototype · synthetic data · tested against fakes, not live services"
 FONTS = ""   # the renderer injects the fonts
 F_DISPLAY, F_BODY, F_MONO = "'DM Serif Display', Georgia, serif", "Inter, 'DM Sans', sans-serif", "'JetBrains Mono', monospace"
 

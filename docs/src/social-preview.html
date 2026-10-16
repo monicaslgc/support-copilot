@@ -1,25 +1,26 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>support-copilot social preview</title>
 <link rel="stylesheet" href="brand.css">
 <style>
+/* Two families only, as the kit asks: DM Serif Display and Inter. */
 body { width:1280px; height:640px; overflow:hidden; position:relative; }
 .blobs i:nth-child(1) { width:640px; height:420px; left:-220px; top:-200px; opacity:.2; }
 .blobs i:nth-child(2) { width:760px; height:420px; right:-260px; bottom:-250px; opacity:.22; }
+.label { font: 500 14px var(--sans); letter-spacing:.32em; text-transform:uppercase; color: var(--muted); }
 .copy { position:absolute; left:84px; top:76px; width:600px; }
-.copy .mono { color: var(--muted); }
-h1 { font: 400 74px/1.04 var(--serif); color: var(--forest); margin: 26px 0 24px -2px; letter-spacing:-.01em; }
+h1 { font: 400 76px/1.04 var(--serif); color: var(--forest); margin: 26px 0 24px -2px; letter-spacing:-.01em; }
 .tag { font: 400 40px/1.2 var(--serif); color: var(--forest); }
 .tag span { color: #6F8876; }
 .foot { position:absolute; left:84px; bottom:62px; width:600px; }
-.foot .mono { color: var(--muted); font-size: 11.5px; line-height:1.7; display:block; }
-.foot .brand { font: 500 16px var(--sans); color: var(--forest); margin-top: 12px; display:block; }
-.shot { position:absolute; right:84px; top:112px; width:440px; height:376px; overflow:hidden; border:1px solid var(--line); background: var(--paper); border-radius:6px; }
-.shot img { position:absolute; width:710px; left:-243px; top:-300px; }
+.foot .label { font-size: 12px; line-height:1.8; display:block; letter-spacing:.16em; }
+.foot .brand { font: 500 17px var(--sans); color: var(--forest); margin-top: 12px; display:block; }
+.shot { position:absolute; right:84px; top:84px; width:504px; height:472px; overflow:hidden; border:1px solid var(--line); background: var(--paper); border-radius:6px; }
+.shot img { position:absolute; width:1000px; left:-330px; top:-470px; }
 </style></head><body>
 <div class="blobs"><i></i><i></i></div>
-<div class="copy"><div class="mono">Independent project · Applied AI</div>
+<div class="copy"><div class="label">Independent project · Applied AI</div>
 <h1>support-copilot</h1>
 <div class="tag">AI-assisted support.<br><span>Human-approved decisions.</span></div></div>
-<div class="foot"><span class="mono">Synthetic data · offline tests · not yet verified against live services</span>
+<div class="foot"><span class="label">Prototype · synthetic data · tested against fakes</span>
 <span class="brand">Creative &amp; Analytical | Product + AI + Automation</span></div>
 <div class="shot"><img src="../review-queue.png" alt=""></div>
 </body></html>
