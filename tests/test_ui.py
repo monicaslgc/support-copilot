@@ -1,4 +1,4 @@
-"""The review page: brand, readability and the properties that keep the human decision unmistakable.
+"""The review page: readability and the properties that keep the human decision unmistakable.
 
 The page is one static file, so these are checks on its source plus the route that serves it. The behaviour
 (approve, reject, bulk, hostile ticket text shown as text) is driven in a real browser by hand, see docs/engineering.md.
@@ -48,15 +48,6 @@ def contrast(a: str, b: str) -> float:
 def test_the_page_is_served():
     r = TestClient(app).get("/")
     assert r.status_code == 200 and "Review queue" in r.text
-
-
-def test_it_uses_the_brand_palette_and_typefaces():
-    light, _ = light_dark()
-    brand = (light["cream"], light["sage"], light["forest"], light["charcoal"])
-    assert brand == ("#F4F1E8", "#A0B3A0", "#153D32", "#202A27")
-    assert (light["bg"], light["ink"], light["accent"]) == (light["cream"], light["charcoal"], light["forest"])
-    for face in ("Inter", "JetBrains Mono", "DM Serif Display"):
-        assert face in PAGE
 
 
 def test_text_keeps_aa_contrast_in_light_and_dark():

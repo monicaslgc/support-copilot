@@ -19,4 +19,5 @@ def isolated_state(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     main.copilot.conn = connect(":memory:")
     main.copilot.systems = build_systems()
+    main.copilot.allow_unsigned_decisions = True   # the secure default has its own tests (test_helpdesk_decisions.py)
     yield

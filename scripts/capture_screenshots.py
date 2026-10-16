@@ -12,7 +12,7 @@ README says; every other scene runs in rules mode.
 CHROMIUM_PATH can name a Chromium binary when Playwright's own download is not installed.
 
 --fonts DIR points at a folder holding JetBrains Mono and DM Serif Display (as @fontsource woff2 files). The page falls
-back to system fonts without it, so a screenshot taken on a machine without the brand fonts looks plainer.
+back to system fonts without it, so a screenshot taken on a machine without the fonts looks plainer.
 """
 import argparse
 import base64
@@ -92,7 +92,7 @@ def review(url: str, tid: int, **extra) -> None:
 
 
 def font_css(fonts: Path | None) -> str:
-    """@font-face rules for the optional brand fonts (@fontsource woff2 files): JetBrains Mono and DM Serif Display."""
+    """@font-face rules for the optional fonts (@fontsource woff2 files): JetBrains Mono and DM Serif Display."""
     if not fonts:
         return ""
     css = []

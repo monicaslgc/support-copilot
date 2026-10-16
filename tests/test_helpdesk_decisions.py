@@ -3,9 +3,15 @@
 Run against Zendesk and Zammad fakes with the same assertions: what counts is what the customer and the agents
 end up seeing in the ticket system.
 """
-import pytest
+import base64
+import hashlib
+import hmac
+import json
 
-from support_copilot import main
+import pytest
+from fastapi.testclient import TestClient
+
+from support_copilot import TicketIn, main
 from support_copilot.config import Taxonomy
 from support_copilot.ticketsystems.base import split_tags
 from tests.fakes import FakeZammad, FakeZendesk
@@ -160,3 +166,72 @@ def test_decision_tags_match_whatever_case_an_adapter_hands_over():
     assert Taxonomy().decision(["ai_reject"]) == (Decision.REJECTED, False)
     assert Taxonomy().decision(["ai_approve", "AI_REJECT"]) == (None, True)
     assert Taxonomy().decision([]) == (None, False)
+
+
+
+# ------------------------------------------------ a decision sends a reply, so it must be signed
+def secure(monkeypatch):
+    """The real default: unsigned decisions are not accepted for a connected ticket system."""
+    monkeypatch.setattr(main.copilot, "allow_unsigned_decisions", False)
+
+
+def queued_for(env, tid=100):
+    """A ticket already in the queue as if its creation webhook had been handled."""
+    env.fake.seed(tid, tags=["vip"])
+    row = main.copilot.submit(TicketIn(subject=SUBJECT, body=BODY, customer="Sam"))
+    main.copilot.conn.execute("UPDATE tickets SET system = ?, external_id = ? WHERE id = ?",
+                              (env.name, str(tid), row["id"]))
+    main.copilot.conn.commit()
+    return row["id"]
+
+
+def signed(env, body: bytes, secret: str) -> dict:
+    """The headers the helpdesk would send with this body."""
+    if env.name == "zendesk":
+        ts = "2026-10-16T10:00:00Z"
+        digest = hmac.new(secret.encode(), ts.encode() + body, hashlib.sha256).digest()
+        return {"X-Zendesk-Webhook-Signature-Timestamp": ts,
+                "X-Zendesk-Webhook-Signature": base64.b64encode(digest).decode()}
+    return {"X-Hub-Signature": "sha1=" + hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()}
+
+
+def test_a_decision_by_tag_is_refused_for_a_connected_system_without_a_webhook_secret(env, monkeypatch):
+    secure(monkeypatch)
+    local_id = arrive(env)
+    r = update(env, add=["ai_approve"])
+    assert r.json()["ignored"] == f"decisions by tag need {env.fake.make().secret_env} to be set"
+    assert env.fake.public(100) == [] and review_row(local_id) is None
+
+
+def test_with_the_secret_set_a_signed_decision_is_accepted_and_a_forged_one_is_not(env, monkeypatch):
+    secure(monkeypatch)
+    monkeypatch.setenv(env.fake.make().secret_env, "s3cret")
+    local_id = queued_for(env)
+    env.fake.agent_adds_tag(100, "ai_approve")
+    body = json.dumps(env.fake.payload(100, SUBJECT, BODY, "Sam", "ana@acme.com", with_tags=True)).encode()
+
+    def send(headers):
+        return env.c.post(f"/webhooks/{env.name}", content=body,
+                          headers={"content-type": "application/json", **headers})
+
+    forged = {k: "forged" for k in signed(env, body, "s3cret")}
+    assert send(forged).status_code == 401 and env.fake.public(100) == []
+    assert send(signed(env, body, "s3cret")).status_code == 201 and len(env.fake.public(100)) == 1
+    assert review_row(local_id)["reviewer"] == "ana@acme.com"
+
+
+def test_unsigned_decisions_can_be_allowed_on_purpose(env, monkeypatch):
+    monkeypatch.setattr(main.copilot, "allow_unsigned_decisions", True)
+    arrive(env)
+    assert update(env, add=["ai_approve"]).status_code == 201 and len(env.fake.public(100)) == 1
+
+
+def test_a_system_without_credentials_never_needs_the_secret_because_nothing_is_sent(monkeypatch):
+    from support_copilot.ticketsystems import ZendeskSystem
+    secure(monkeypatch)
+    monkeypatch.setitem(main.copilot.systems, "zendesk", ZendeskSystem())          # dry-run: no credentials
+    c = TestClient(main.app)
+    hook = {"ticket_id": "7", "subject": SUBJECT, "description": BODY}
+    made = c.post("/webhooks/zendesk", json=hook).json()
+    again = c.post("/webhooks/zendesk", json={**hook, "tags": "ai_approve", "agent": "ana@acme.com"}).json()
+    assert again["decided_in"] == "zendesk" and review_row(made["id"])["action"] == "approved"

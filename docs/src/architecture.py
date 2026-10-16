@@ -1,9 +1,6 @@
-"""The architecture diagram, drawn with the author's own diagram kit (Dark green / Cream / Sage / Charcoal, DM Serif
-Display + Inter + JetBrains Mono). The Diagram class and the icons are from that kit, trimmed to what is used here.
+"""The architecture diagram, as SVG (a cream background, dark-green steps, sage shapes).
 
     python docs/src/architecture.py        # writes docs/src/architecture.svg (scripts/render_assets.py makes the PNG)
-
-The kit's colours file was not available, so the neutral tints (border, step, line) are derived from the palette.
 """
 import html
 from pathlib import Path

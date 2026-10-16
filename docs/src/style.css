@@ -1,5 +1,5 @@
-/* Brand kit: Cream #F4F1E8, Sage #A0B3A0, Dark green #153D32, Charcoal #202A27, Muted green #6F8876.
-   --muted is a darker shade of the muted green so small text keeps AA contrast. */
+/* Colours shared by the image sources in docs/src and marketing/. --muted is darker than the muted green
+   (#6F8876) so small text keeps AA contrast. */
 :root { --sage:#A0B3A0; --cream:#F4F1E8; --forest:#153D32; --charcoal:#202A27; --muted:#4C6354; --line:#D6D9D0; --panel:#DDE5DC; --paper:#FAF8F2;
   --serif: "DM Serif Display", "Cormorant Garamond", Georgia, serif; --sans: Inter, "DM Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
 * { box-sizing: border-box; margin: 0; }

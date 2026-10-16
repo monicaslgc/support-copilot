@@ -3,11 +3,11 @@
     pip install playwright
     python scripts/render_assets.py [--fonts DIR]
 
-docs/src/architecture.py        -> docs/src/architecture.svg -> docs/architecture.png   (the author's diagram kit style)
+docs/src/architecture.py        -> docs/src/architecture.svg -> docs/architecture.png   (the architecture diagram)
 docs/src/social-preview.html    -> docs/social-preview.png   (1280 x 640, the GitHub social preview)
 marketing/linkedin/src/post-graphic.html -> marketing/linkedin/images/support-copilot-4x5.png   (1080 x 1350)
 
-The sources use the brand tokens in docs/src/brand.css. Fonts: see scripts/capture_screenshots.py (--fonts).
+The sources share the colours in docs/src/style.css. Fonts: see scripts/capture_screenshots.py (--fonts).
 Screenshots are not generated here: run scripts/capture_screenshots.py first, the sources embed docs/*.png.
 """
 import argparse

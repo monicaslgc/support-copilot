@@ -24,6 +24,7 @@ cp = Copilot(
     api_key=None,               # X-API-Key for the router; default is the API_KEY environment variable
     taxonomy=None,              # your tags and names, and the tags that approve or reject (below)
     allowed_reviewers=None,     # emails who may decide by tag in the helpdesk; default is anyone who can edit the ticket
+    allow_unsigned_decisions=False,  # tag decisions need the webhook secret for a connected system (see integrations)
 )
 
 suggestion = cp.suggest(TicketIn(subject=..., body=..., customer=...))   # triage + draft, nothing stored or sent

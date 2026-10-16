@@ -4,28 +4,26 @@ Estrutura do kit: gancho, contexto, trabalho, aprendizagem, limitações, CTA.
 
 ---
 
-A IA propõe, regras determinísticas decidem, as pessoas aprovam. Quis ver como isto fica numa fila de apoio ao cliente.
+A IA propõe, regras determinísticas decidem, as pessoas aprovam. Quis ver como isto cabe dentro do helpdesk que uma equipa de apoio ao cliente já usa, em vez de ficar ao lado.
 
-A maior parte das demos de IA para apoio ao cliente mostra o que um modelo consegue escrever. A pergunta mais difícil é o que é preciso para deixar esse texto chegar perto de um cliente.
+A maior parte das demos de IA para apoio ao cliente é mais uma aplicação. Uma equipa já tem um helpdesk e ninguém quer abrir mais uma ferramenta.
 
-Por isso criei o support-copilot, um projeto independente de conceito, com dados sintéticos. A IA prepara cada ticket: triagem, uma resposta no idioma do cliente e um aviso se o rascunho prometer algo que não deve. Uma pessoa aprova ou rejeita cada resposta. Nada chega ao cliente antes disso.
+Por isso criei o support-copilot como um complemento, um projeto independente de conceito, com dados sintéticos. Ouve o helpdesk (Zendesk, Zammad ou o vosso), faz a triagem de cada ticket, prepara uma resposta no idioma do cliente a partir dos vossos artigos de ajuda e escreve o resultado de volta como nota interna e etiquetas. O agente decide sem sair do ticket: junta a etiqueta ai_approve e a resposta preparada segue para o cliente, junta ai_reject e responde ele próprio. Nada chega ao cliente antes disso.
 
 Quatro decisões que defendo:
 
-1. O modelo nunca vê dados privados em bruto. Emails, cartões, IBAN, telefones e palavras-passe são mascarados primeiro por regras simples, com verificações Luhn e mod-97 para que um número de encomenda não seja apagado.
+1. As etiquetas são a interface. Os vossos acionadores e vistas podem encaminhar com base nelas, os nomes são vossos, e o complemento nunca precisa de conhecer os vossos grupos ou campos personalizados.
 
-2. As promessas são verificadas por regras, não pedindo ao modelo que se porte bem. Um rascunho escrito pelo modelo que prometa um reembolso é substituído pela resposta-padrão. Se for o revisor a escrevê-lo, a página avisa e pede um segundo clique.
+2. Uma decisão é assinada. Aprovar por etiqueta envia uma resposta a um cliente, por isso, num helpdesk ligado, só é aceite quando a assinatura do webhook pode ser verificada, e podem limitá-la às pessoas que indicarem.
 
-3. A falha é visível. Se o modelo recusar, for cortado a meio ou estiver em baixo, o ticket é na mesma triado por regras e o ecrã di-lo.
+3. Regras simples rodeiam o modelo. Os dados privados são mascarados antes dele, com verificações Luhn e mod-97 para que um número de encomenda fique intacto. As promessas são apanhadas depois: um rascunho que prometa um reembolso é substituído pela resposta padrão.
 
-4. As decisões humanas tornam-se dados. Por categoria, a aplicação mostra com que frequência a IA acertou, com um limite de confiança: três revisões perfeitas não são evidência. "Candidata a automação" é apenas informativo. Nada é automatizado.
+4. As decisões humanas tornam-se dados. Por categoria, mostra quantas vezes a IA acertou, com um limite de confiança: três revisões perfeitas não são evidência. O "candidato a automação" é só informativo. Nada é automatizado.
 
-Numa falha de serviço, os tickets quase idênticos ficam agrupados num possível incidente e respondidos com um clique, continuando a ser revisões individuais.
+O que levo daqui: um sistema de IA útil precisa de limites claros, verificações determinísticas onde fazem sentido, juízo humano e comportamento que se possa testar. Por isso tem 385 testes offline, com cada uma das doze histórias de utilizador como teste de aceitação executável. É uma biblioteca Python com um router FastAPI opcional e uma página de revisão opcional, para que uma equipa use só a parte de que precisa.
 
-O que levo daqui: um sistema de IA útil precisa de mais do que bons resultados. Precisa de limites claros, verificações determinísticas onde fazem sentido, juízo humano e comportamento que se possa testar. Por isso tem 379 testes offline, com cada história de utilizador como teste de aceitação executável.
+O que não é: os adaptadores de Zammad e Zendesk foram testados contra simulações, e o caminho do Claude contra um SDK simulado. Nada correu ainda num helpdesk real nem na API real, incluindo os payloads que trazem as etiquetas. As salvaguardas têm lacunas documentadas (nomes e moradas não são mascarados; uma promessa com redação estranha passa). Uma pessoa continua a ler todas as respostas. Prefiro dizê-lo com clareza.
 
-O que não é: os adaptadores de Zammad e Zendesk foram testados contra simulações, o caminho do Claude contra um SDK simulado, e as proteções têm lacunas documentadas (nomes e moradas não são mascarados; uma promessa com redação invulgar passa). Uma pessoa continua a ler cada resposta. Prefiro dizê-lo com clareza.
-
-Código, capturas de ecrã e página de limitações: https://github.com/monicaslgc/support-copilot
+Código, capturas de ecrã e a página de limitações: https://github.com/monicaslgc/support-copilot
 
 #AI #ProductManagement #Automation #OpenSource #BusinessAnalysis

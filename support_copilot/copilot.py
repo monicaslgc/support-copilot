@@ -49,6 +49,9 @@ class Copilot:
     taxonomy the tags and names written to your helpdesk, and the tags that approve or reject from inside it
     allowed_reviewers  emails or names who may approve or reject by tag in the helpdesk; default is anyone the
                        helpdesk lets edit the ticket. Compared without regard to case.
+    allow_unsigned_decisions  a decision by tag sends a reply to a customer, so for a connected ticket system it is
+                       only accepted when that system's webhook secret is set (the signature is what proves the tag
+                       came from your helpdesk). True accepts it without; dry-run systems never need it.
 
     Thread-safe: one SQLite connection is shared and every access takes `lock`, which is never held across
     a network or model call. Read `copilot.conn` and `copilot.systems` as attributes at call time.
@@ -57,7 +60,8 @@ class Copilot:
     def __init__(self, db: str | os.PathLike | sqlite3.Connection | None = ":memory:",
                  kb: str | os.PathLike | KnowledgeBase | None = None,
                  systems: dict[str, TicketSystem] | None = None, api_key: str | None = None,
-                 taxonomy: Taxonomy | None = None, allowed_reviewers: set[str] | frozenset[str] | None = None):
+                 taxonomy: Taxonomy | None = None, allowed_reviewers: set[str] | frozenset[str] | None = None,
+                 allow_unsigned_decisions: bool = False):
         self.conn = (database.init(db) if isinstance(db, sqlite3.Connection)
                      else database.connect(None if db is None else str(db)))
         self.kb = kb if isinstance(kb, KnowledgeBase) else KnowledgeBase(Path(kb)) if kb else KnowledgeBase()
@@ -65,6 +69,7 @@ class Copilot:
         self.api_key = api_key
         self.taxonomy = taxonomy or Taxonomy()
         self.allowed_reviewers = {r.strip().lower() for r in allowed_reviewers} if allowed_reviewers else None
+        self.allow_unsigned_decisions = allow_unsigned_decisions
         self.lock = threading.RLock()
 
     # -- access ------------------------------------------------------------------------------------------
@@ -388,6 +393,10 @@ class Copilot:
             return {**already, "ignored": "both decision tags are set"}
         if decision is None:
             return already
+        if system.configured and not os.getenv(system.secret_env) and not self.allow_unsigned_decisions:
+            log.warning("%s ticket %s: a decision by tag is ignored because %s is not set", system.name,
+                        inbound.external_id, system.secret_env)
+            return {**already, "ignored": f"decisions by tag need {system.secret_env} to be set"}
         actor = (inbound.actor or "").strip()
         if self.allowed_reviewers is not None and actor.lower() not in self.allowed_reviewers:
             log.warning("%s ticket %s: %r may not decide from the helpdesk", system.name, inbound.external_id, actor)

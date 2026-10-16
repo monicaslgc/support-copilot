@@ -18,11 +18,12 @@ Upload as a multi-image post. LinkedIn shows the first image in the feed and cro
 | 2 | `docs/review-queue.png` | The human decision, clearly separated from the AI's suggestion | The review page with the ticket, the AI's triage and draft, and a separate Your decision panel |
 | 3 | `docs/guardrails.png` | Masking and the promise warning | A reply promising a refund is flagged before approval |
 | 4 | `docs/incident-spike.png` | Product thinking: an outage becomes one incident | Four tickets grouped as a possible incident, answered with one click |
-| 5 | `docs/architecture.png` (16:9) | Which steps are AI, which are plain rules, where the human sits | Flow from ticket through masking, triage, drafting, checks and human approval to the customer |
+| 5 | `docs/architecture.png` (16:9) | Which steps are AI, which are plain rules, where the human sits | Flow from ticket through masking, triage, drafting and checks to a person who approves by tagging the ticket in the helpdesk, and then to the customer |
 | 6 (optional) | `docs/insights.png` | The feedback loop, with synthetic demo data | Clean rate per category with a confidence lower bound |
 
 ## Product decisions worth highlighting
 
+0. **An add-on, not an app.** It lives in the helpdesk the team already uses: the agent approves by tagging the ticket, the tags and names are the company's own, and a decision is only accepted from a signed webhook.
 1. **The AI suggests, a person decides.** The approval step is the product, not an afterthought, and the UI keeps ticket, AI suggestion and human decision visibly apart.
 2. **Deterministic checks around the model.** Masking before, promise detection after, as readable rules that can be tested.
 3. **Visible failure.** Fallback to rules is labelled, never silent.
@@ -37,6 +38,6 @@ Used in the post, from the kit's short list: `#AI #ProductManagement #Automation
 ## Before posting (manual)
 
 - Merge the branch and make sure the images in `docs/` are on `main`, so the repository link shows them.
-- Set the GitHub social preview (see [docs/presentation.md](../../docs/presentation.md)), so the link card looks right.
+- Set the GitHub social preview (see [docs/images.md](../../docs/images.md)), so the link card looks right.
 - Re-read the claims against the repository on the day: the test count and the number of user stories change whenever tests or stories are added.
 - Add the link in the post or in the first comment, then publish it yourself.
