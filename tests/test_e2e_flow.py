@@ -48,7 +48,7 @@ def test_happy_path_exact_state(env):
     assert fz.public(100) == []                                  # customer sees nothing
     assert len(fz.internal(100)) == 1 and "pending human review" in fz.internal(100)[0]
     assert fz.priority(100) == fz.PRIO["P3"]
-    assert fz.tags(100) == {"vip", "renewal", "ai_triaged", "ai_cat_billing", "ai_team_finance"}
+    assert fz.tags(100) == {"vip", "renewal", "ai_triaged", "ai_cat_billing", "ai_team_finance", "ai_lang_en"}
     assert [t["id"] for t in env.c.get("/tickets", params={"status": "pending_review"}).json()] == [local_id]
 
     # --- human approves with edits ---

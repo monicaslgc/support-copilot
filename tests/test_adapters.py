@@ -76,7 +76,7 @@ def test_zammad_wire_format_internal_note():
     assert r.status_code == 201
     sent = [(q.method, q.url.path) for q in fz.requests]
     assert sent[:2] == [("PUT", "/api/v1/tickets/55"), ("POST", "/api/v1/ticket_articles")]
-    assert all(p == "/api/v1/tags/add" for _, p in sent[2:]) and len(sent) == 5   # 3 AI tags
+    assert all(p == "/api/v1/tags/add" for _, p in sent[2:]) and len(sent) == 6   # 4 AI tags
     b = bodies(fz)
     assert b[0] == {"priority_id": 2}                                    # P3 -> normal
     assert b[1]["internal"] is True and b[1]["type"] == "note" and b[1]["ticket_id"] == 55

@@ -46,6 +46,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 #clusters:empty { display: none; }
 .banner { background: color-mix(in srgb, var(--p2) 14%, transparent); border: 1.5px solid var(--p2); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
 .link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; }
+.hist li { padding: 2px 0; }
 .detail { padding: 16px; display: grid; gap: 16px; }
 .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
 h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
@@ -132,6 +133,10 @@ function el(tag, props = {}, ...kids) {
   return e;
 }
 const chip = (p) => el("span", { class: `chip ${p}`, text: p });
+const langName = (c) => {
+  if (!c || c === "und") return "unclear";
+  try { return new Intl.DisplayNames(["en"], { type: "language" }).of(c) || c; } catch { return c; }
+};
 const pct = (v) => (v === undefined ? "–" : `${Math.round(v * 100)}%`);
 
 async function loadMetrics() {
@@ -174,6 +179,7 @@ async function loadList() {
     const b = el("button", { class: "item", type: "button", "aria-current": String(selected === t.id) },
       el("span", { class: "subj", text: t.subject }),
       el("span", { class: "sub" }, chip(tr.priority), document.createTextNode(`${tr.category} · ${t.customer} `),
+        ...(tr.sentiment === "negative" ? [el("span", { class: "tag", text: "upset" })] : []),
         ...(t.cluster ? [el("span", { class: "tag", text: `${t.cluster.kind === "spike" ? "incident" : "related"} ×${t.cluster.size}` })] : []),
         ...(t.duplicate_of ? [el("span", { class: "tag", text: "possible duplicate" })] : [])));
     b.addEventListener("click", () => { selected = t.id; say(""); render(); });
@@ -226,6 +232,13 @@ function render() {
     related.append(el("div", { class: "note", text: `Possible duplicate of ticket #${t.duplicate_of} (same customer and category, close in time).` }));
   }
 
+  const hist = el("div", {});
+  if (t.history && t.history.count) {
+    hist.append(el("h3", { text: `Earlier tickets from this customer (${t.history.count})` }),
+      el("ul", { class: "hist" }, ...t.history.recent.map((h) =>
+        el("li", { class: "note", text: `#${h.id} ${h.subject} · ${h.status.replace("_", " ")}` }))));
+  }
+
   const field = (label, node) => el("div", { class: "field" }, el("label", { text: label }), node);
   const arts = s.articles.length
     ? s.articles.map((a) => el("span", { class: "tag", text: a.title }))
@@ -238,9 +251,12 @@ function render() {
     el("div", {}, el("h3", { text: "AI triage" }),
       el("div", { class: "grid" }, field("Priority", prio), field("Category", cat),
         field("Team", el("div", { text: tr.team })),
-        field("Confidence", el("div", { text: `${pct(tr.confidence)} · ${tr.source}` }))),
+        field("Confidence", el("div", { text: `${pct(tr.confidence)} · ${tr.source}` })),
+        field("Sentiment", el("div", { text: tr.sentiment || "–" })),
+        field("Language", el("div", { text: langName(tr.language) }))),
       el("div", { class: "rationale", text: tr.rationale })),
     ...(related.children.length ? [related] : []),
+    ...(hist.children.length ? [hist] : []),
     el("div", {}, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
     el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply),
     pending

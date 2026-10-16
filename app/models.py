@@ -25,6 +25,12 @@ class Status(StrEnum):
     REJECTED = "rejected"
 
 
+class Sentiment(StrEnum):
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+    POSITIVE = "positive"
+
+
 class Decision(StrEnum):
     """What a human can decide. Deliberately has no 'pending' value."""
 
@@ -45,6 +51,8 @@ class Triage(BaseModel):
     confidence: float = Field(ge=0, le=1)
     rationale: str
     source: str  # "llm" or "rules"
+    sentiment: Sentiment = Sentiment.NEUTRAL
+    language: str = "und"  # ISO 639-1 code, or "und" when unclear
 
 
 class Suggestion(BaseModel):

@@ -16,7 +16,7 @@ from .classifier import classify
 from .db import connect, now, row_to_ticket
 from .drafting import draft_reply
 from .kb import KnowledgeBase, tokens
-from .models import Category, Decision, Priority, Review, Status, Suggestion, TicketIn
+from .models import Category, Decision, Priority, Review, Sentiment, Status, Suggestion, TicketIn, Triage
 from .ticketsystems import TicketSystem, WebhookError, build_systems
 
 log = logging.getLogger("support_copilot")
@@ -88,6 +88,28 @@ def _attach_clusters(tickets: list[dict]) -> list[dict]:
     stats = _cluster_stats([t.get("cluster_id") for t in tickets])
     for t in tickets:
         t["cluster"] = stats.get(t.get("cluster_id"))
+    return tickets
+
+
+def _customer_history(customer: str, before_id: int, limit: int = 5) -> dict:
+    """The same customer's earlier tickets (by the customer string the ticket system sent: a name or an
+    email, so two people with the same name are indistinguishable). "unknown" has no history."""
+    if not customer.strip() or customer.strip().lower() == clusters.UNKNOWN:
+        return {"count": 0, "recent": []}
+    where, params = "lower(customer) = lower(?) AND id < ?", (customer.strip(), before_id)
+    count = _one(f"SELECT COUNT(*) AS n FROM tickets WHERE {where}", params)["n"]
+    recent = []
+    for r in _all(f"SELECT id, subject, status, created_at, suggestion FROM tickets WHERE {where}"
+                  " ORDER BY id DESC LIMIT ?", (*params, limit)):
+        tr = json.loads(r["suggestion"]).get("triage", {})
+        recent.append({"id": r["id"], "subject": r["subject"], "status": r["status"], "created_at": r["created_at"],
+                       "category": tr.get("category"), "priority": tr.get("priority")})
+    return {"count": count, "recent": recent}
+
+
+def _attach_history(tickets: list[dict]) -> list[dict]:
+    for t in tickets:
+        t["history"] = _customer_history(t["customer"], t["id"])
     return tickets
 
 
@@ -184,7 +206,7 @@ def _push(system: TicketSystem, ext_id: str, kind: str, call, *args, **kwargs):
 
 def _context(tid: int) -> dict:
     """What we know about how this ticket relates to others, for the internal note and tags."""
-    row = _one("SELECT cluster_id, duplicate_of, system FROM tickets WHERE id = ?", (tid,))
+    row = _one("SELECT cluster_id, duplicate_of, system, customer FROM tickets WHERE id = ?", (tid,))
     cluster = _cluster_stats([row["cluster_id"]]).get(row["cluster_id"]) if row and row["cluster_id"] else None
     duplicate = None
     if row and row["duplicate_of"]:
@@ -192,12 +214,15 @@ def _context(tid: int) -> dict:
         if d:
             same_system = d["system"] and d["system"] == row["system"]
             duplicate = f"{d['system']} ticket {d['external_id']}" if same_system else f"ticket #{d['id']}"
-    return {"cluster": cluster, "duplicate_of": duplicate}
+    return {"cluster": cluster, "duplicate_of": duplicate,
+            "history": _customer_history(row["customer"], tid) if row else {"count": 0, "recent": []}}
 
 
-def _context_tags(ctx: dict) -> list[str]:
-    return (["ai_possible_duplicate"] if ctx["duplicate_of"] else []) + (
-        ["ai_spike"] if ctx["cluster"] and ctx["cluster"]["kind"] == "spike" else [])
+def _context_tags(ctx: dict, triage: Triage) -> list[str]:
+    return ((["ai_possible_duplicate"] if ctx["duplicate_of"] else [])
+            + (["ai_spike"] if ctx["cluster"] and ctx["cluster"]["kind"] == "spike" else [])
+            + (["ai_sentiment_negative"] if triage.sentiment is Sentiment.NEGATIVE else [])
+            + ([f"ai_lang_{triage.language}"] if triage.language != "und" else []))
 
 
 def _internal_note(s: Suggestion, ctx: dict | None = None) -> str:
@@ -210,11 +235,16 @@ def _internal_note(s: Suggestion, ctx: dict | None = None) -> str:
         what = f'"{c["topic_title"]}"' if c["topic_title"] else "the same issue"
         lead = "POSSIBLE INCIDENT" if c["kind"] == "spike" else "Related"
         lines.append(f"{lead}: {c['size']} tickets from {c['customers']} customers about {what} in a short window.")
+    if ctx and ctx.get("history", {}).get("count"):
+        h = ctx["history"]
+        lines.append(f"Repeat customer: {h['count']} earlier ticket{'s' if h['count'] != 1 else ''}"
+                     f" (latest: \"{h['recent'][0]['subject'][:60]}\", {h['recent'][0]['status']}).")
     related = ("\n".join(lines) + "\n") if lines else ""
     return (
         f"[AI triage - pending human review]\n"
         f"Category: {tr.category.value} | Priority: {tr.priority.value} | Team: {tr.team} "
         f"| Confidence: {tr.confidence} ({tr.source})\n"
+        f"Sentiment: {tr.sentiment.value} | Language: {tr.language}\n"
         f"Why: {tr.rationale}\n{related}KB articles: {arts}\n\nSuggested reply:\n{s.draft_reply}"
     )
 
@@ -252,7 +282,8 @@ def _ingest(system: TicketSystem, headers, raw: bytes) -> dict:
     # Internal note only: the customer sees nothing until a human approves.
     _push(system, inbound.external_id, "triage_note", system.post_internal_note, _internal_note(s, ctx),
           priority=s.triage.priority, category=s.triage.category,
-          tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}", *_context_tags(ctx)])
+          tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}",
+                *_context_tags(ctx, s.triage)])
     return {"id": tid, "status": Status.PENDING_REVIEW, "suggestion": s}
 
 
@@ -276,7 +307,7 @@ def list_tickets(status: Status | None = None, limit: int = Query(100, ge=1, le=
     rows = _all(q, (status.value,) if status else ())
     tickets = [row_to_ticket(r) for r in rows]
     tickets.sort(key=lambda t: (t["suggestion"]["triage"]["priority"], t["created_at"]))
-    return _attach_clusters(_attach_reviews(tickets[:limit]))
+    return _attach_history(_attach_clusters(_attach_reviews(tickets[:limit])))
 
 
 @api.get("/tickets/{ticket_id}")
@@ -284,11 +315,12 @@ def get_ticket(ticket_id: int):
     row = _one("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
     if not row:
         raise HTTPException(404, "ticket not found")
-    return _attach_clusters(_attach_reviews([row_to_ticket(row)]))[0]
+    return _attach_history(_attach_clusters(_attach_reviews([row_to_ticket(row)])))[0]
 
 
 def _apply_review(ticket_id: int, r: Review) -> dict:
-    """Record a human decision. Approved replies go to the customer (tickets from a ticket system) as a public reply."""
+    """Record a human decision. For tickets from a ticket system, an approved reply goes to the customer
+    as a public reply."""
     row = _one("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
     if not row:
         raise HTTPException(404, "ticket not found")

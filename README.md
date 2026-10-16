@@ -81,6 +81,19 @@ When an outage starts, the queue fills with near-identical tickets. Reviewing th
 
 Limits: matching is lexical (same words, same article), not semantic. Linking can chain: A joins B and B joins C even if A and C are far apart in time. Bulk reviews count each ticket in `/metrics`, so a large incident weighs heavily on the agreement numbers. Nothing raises a ticket's priority automatically. It only warns.
 
+## Sentiment, language and customer context
+
+The triage records two more signals, and the reviewer sees who the customer is:
+
+- **Sentiment** (`negative`, `neutral`, `positive`). An upset customer raises a routine ticket one level (P4 to P3, P3 to P2) so it is not left at the bottom of the queue. P2 and P1 never move: P1 is for outages and security, whatever the tone. The rationale says when this happened. Without the model, a rule set flags clearly upset text in English, Portuguese, Spanish, French and Italian (strong words, or a mild word plus shouting or "!!"); it never reports `positive`, and a question like "how do I cancel my subscription?" stays neutral.
+- **Language** (an ISO code, or `und` when unclear). The reply is drafted in the customer's language: the model is told the language and the mood, and the fallback template exists in English, Portuguese, Spanish and French, with an apology line for upset customers.
+- **Customer history.** Earlier tickets from the same customer are listed in the review page and flagged in the internal note (`Repeat customer: 2 earlier tickets ...`). The match is on the customer string the ticket system sends (a name or an email), so two people with the same name look alike, and `unknown` never has a history.
+- Zammad and Zendesk get the signals as tags (`ai_sentiment_negative`, `ai_lang_pt`) and in the internal note, so agents who never open this tool still see them.
+
+![Customer context](docs/customer-context.png)
+
+Knowledge-base articles can carry a `Keywords:` line with synonyms and other languages. Retrieval is lexical, so that is what lets a Portuguese ticket find an English article without the model.
+
 ## Ticket system integrations
 
 ```
@@ -130,7 +143,7 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 
 ## Tests
 
-109 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
+171 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
@@ -142,7 +155,8 @@ I checked that the tests catch real bugs by breaking the code on purpose, 20+ wa
 ## Known limitations
 
 - Not verified against live Zammad or Zendesk instances (see status above).
-- Retrieval is TF-IDF over six sample articles, with plural folding and a cutoff relative to the best match. It is lexical: it does not understand synonyms, so a differently worded question can miss the right article. Embeddings (for example pgvector) are the next step.
+- Retrieval is TF-IDF over six sample articles, with plural folding and a cutoff relative to the best match. It is lexical: it does not understand synonyms (unless an article lists them under `Keywords:`), so a differently worded question can miss the right article, and a ticket that is mostly emotion can match two weak articles. Embeddings (for example pgvector) are the next step.
+- The rule-based sentiment and language detection is a small word list, not a model: it misses sarcasm and subtle anger, and short or mixed-language text is often `und`. Treat it as a baseline.
 - Rule-based classification is a baseline, not a production classifier.
 - No automatic retry for failed ticket-system calls; no check on webhook timestamp age.
 - A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.
