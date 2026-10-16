@@ -1,6 +1,8 @@
-# support-copilot
+# Support Copilot
 
 [![tests](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml/badge.svg)](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml)
+
+![Support Copilot — AI can prepare the answer; a person decides what gets sent. The workflow runs from ticket through triage, draft and human review to the customer.](docs/project-cover.svg)
 
 **A human-in-the-loop AI copilot for support tickets.** It triages each ticket, finds the right help article, drafts the reply in the customer's language and warns when a draft promises something it shouldn't. **A person approves every message before it reaches the customer**, and the app measures where the AI has earned more trust.
 
@@ -41,7 +43,7 @@ Eleven [user stories](docs/user-stories.md) spell out what each of them needs, w
 
 ![Architecture: a ticket arrives, private data is masked, it is triaged, a reply is drafted and checked, a person reviews it, and only then the customer is answered; the decision feeds per-category metrics](docs/architecture.png)
 
-## See it
+## See it in action
 
 | Customer context | Insights |
 |---|---|
@@ -53,7 +55,7 @@ Eleven [user stories](docs/user-stories.md) spell out what each of them needs, w
 | ![Guardrails: private details masked before the model, and a warning on a reply that promises a refund](docs/guardrails.png) | ![The review page on a phone in dark mode](docs/mobile-dark.png) |
 | What was masked, and a warning on a promise (shown with a stub model). | The same page, responsive. |
 
-## Try it
+## Try it locally
 
 Needs Python 3.11 or newer. No API key and no account are needed.
 
@@ -69,7 +71,7 @@ pytest                                 # 322 tests, offline
 
 To use Claude, set `ANTHROPIC_API_KEY` (the model is `TRIAGE_MODEL`). To connect Zammad or Zendesk, see [integrations](docs/integrations.md). Every setting is in [API and configuration](docs/api.md).
 
-## How it is checked
+## How it is validated
 
 - **322 tests** on Python 3.11 and 3.12, with `ruff`, in CI. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks) and security checks.
 - **User stories are executable:** each of the eleven stories has an acceptance test, and a test fails if a story, its test or its demo scenario drifts apart. The demo scenarios also run in CI, and again and again against one server, as a real one keeps its tickets between runs.
@@ -77,7 +79,7 @@ To use Claude, set `ANTHROPIC_API_KEY` (the model is `TRIAGE_MODEL`). To connect
 - **Driven in a real browser** (Chromium) for the approve, reject and bulk flows and a hostile ticket that must show as text. That run is manual, not part of CI.
 - **Measured:** saving a ticket stays at about 6.5 ms from 100 to 2000 tickets in an hour. [Engineering notes](docs/engineering.md).
 
-## What it does not do yet
+## Current limitations
 
 - It has not run against a real Zammad, Zendesk or the live Claude API.
 - Retrieval is lexical, and the rule-based fallbacks are baselines, not production classifiers.
