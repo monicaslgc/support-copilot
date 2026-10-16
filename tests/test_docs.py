@@ -68,17 +68,14 @@ def test_the_test_count_quoted_in_the_docs_is_the_real_one():
     for doc in (ROOT / "README.md", ROOT / "docs" / "engineering.md"):
         quoted = {int(n) for n in re.findall(r"\b(\d+) tests\b", doc.read_text(encoding="utf-8"))}
         assert quoted == {count}, f"{doc.name} says {sorted(quoted)} tests, there are {count}"
-    for doc in sorted((ROOT / "marketing").rglob("*.md")):   # the LinkedIn drafts quote it too: they must not go stale
-        text = doc.read_text(encoding="utf-8")
-        quoted = {int(n) for n in re.findall(r"\b(\d+) (?:offline )?tests?\b|\b(\d+) testes\b", text) for n in n if n}
-        assert quoted <= {count}, f"{doc.relative_to(ROOT)} says {sorted(quoted)} tests, there are {count}"
+
 
 
 def test_the_number_of_user_stories_quoted_outside_the_stories_document_is_the_real_one():
     words = {n: w for n, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen "
                                         "fourteen fifteen".split())}
     expected = words[len(_stories())]
-    for doc in (ROOT / "README.md", *sorted((ROOT / "marketing").rglob("*.md"))):
+    for doc in (ROOT / "README.md",):
         said = re.findall(r"\b([A-Za-z]+) (?:\[)?user stories\b", doc.read_text(encoding="utf-8"))
         said = {w.lower() for w in said if w.lower() in words.values()}
         assert said <= {expected}, f"{doc.relative_to(ROOT)} says {sorted(said)} user stories, there are {expected}"

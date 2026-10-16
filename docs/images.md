@@ -9,8 +9,6 @@ Where the pictures in the README and the docs come from. Back to the [README](..
 | `architecture.png` | The flow of a ticket (`docs/src/architecture.py`) | `scripts/render_assets.py` |
 | `social-preview.png` | 1280 x 640 GitHub social preview, also the README header | `scripts/render_assets.py` |
 
-The announcement material (a LinkedIn post and its graphic) is in [`marketing/`](../marketing/linkedin/README.md). It is not part of the library.
-
 ```bash
 pip install playwright
 python scripts/capture_screenshots.py   # needs Chromium; CHROMIUM_PATH names a binary if Playwright's download is not installed
