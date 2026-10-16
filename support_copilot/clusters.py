@@ -8,7 +8,7 @@ Two separate ideas, both rule-based so a reviewer can always see *why* tickets w
 - A possible duplicate is the same customer opening another ticket of the same category in the window.
   It is only a flag: a person decides whether it really is a duplicate.
 
-These are pure functions over `Item`s so they are easy to test; main.py feeds them rows from the database.
+These are pure functions over `Item`s so they are easy to test; copilot.py feeds them rows from the database.
 """
 import os
 from collections.abc import Iterable

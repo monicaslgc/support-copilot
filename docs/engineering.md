@@ -4,7 +4,7 @@ How it is tested and how it behaves as the queue grows. Back to the [README](../
 
 ## Tests
 
-456 tests, run on Python 3.11, 3.12 and 3.13 in CI together with `ruff`, plus a job that installs the built wheel in a clean environment and runs the library example. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
+470 tests, run on Python 3.11, 3.12 and 3.13 in CI together with `ruff` and `mypy`, plus a job that installs the built wheel in a clean environment and runs the library example. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
@@ -14,7 +14,7 @@ How it is tested and how it behaves as the queue grows. Back to the [README](../
 - **The review page:** `tests/test_ui.py` checks the colour tokens, that every text and background pair keeps WCAG AA contrast in light and dark, that ticket text is never inserted as HTML, that nothing is loaded from outside, that ticket, AI suggestion and human decision are separate, and that the approval controls and the empty, loading and error states exist. It reads the page source: it does not run the JavaScript.
 - **Security and limits:** API key on every protected route, webhook signatures, oversized webhooks, review actions that are not approved/rejected.
 
-I checked that the tests catch real bugs by breaking the code on purpose, 20+ ways (public/internal swapped, tags overwritten, wrong priority map, wrong signature algorithm, missing idempotency, ids colliding across systems, non-atomic review, unlocked database reads, reading `content[0]` instead of the text block, the old `max_tokens`, a 10 minute timeout, unhandled refusals, no API key check, no size limit): each break made at least one test fail.
+I checked that the tests catch real bugs by breaking the code on purpose in more than 20 ways (public/internal swapped, tags overwritten, wrong priority map, wrong signature algorithm, missing idempotency, ids colliding across systems, non-atomic review, unlocked database reads, reading `content[0]` instead of the text block, the old `max_tokens`, a 10 minute timeout, unhandled refusals, no API key check, no size limit): each break made at least one test fail.
 
 ## Performance
 

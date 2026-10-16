@@ -35,7 +35,7 @@ cp.review(queued["id"], Review(action="approved", reviewer="ana"))       # a per
 | Method | What it does |
 |---|---|
 | `suggest(ticket)` | Category, priority, team, sentiment, language, the matching articles and a checked draft. No storage, no network except the model call if Claude is on. |
-| `submit(ticket)` | `suggest` plus storing, linking to duplicates and incidents. Returns the id; the ticket waits for review. |
+| `submit(ticket)` | `suggest` plus storing, linking to duplicates and incidents. Returns a dict with the ticket's `id`, its `status` and the `suggestion`; the ticket waits for review. |
 | `list_tickets(status, limit)`, `get_ticket(id)` | The queue, most urgent first, with the customer's history, the incident it belongs to and the review. |
 | `review(id, Review(...))` | Records a person's decision. For tickets from a ticket system, an approved reply is posted to the customer; a rejection is not. |
 | `list_clusters()`, `review_cluster(id, Review(...))` | Possible incidents, and one decision for all their pending tickets. |

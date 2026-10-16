@@ -52,7 +52,7 @@ Export some past tickets (a CSV with a header, a JSON list or JSON lines). Each 
 python -m support_copilot.evaluate tickets.csv --kb our-articles/ --rules --out results.csv
 ```
 
-(`--rules` never calls Claude; leave it out to use Claude, at two model calls per ticket.)
+(`--rules` never calls Claude; leave it out to use Claude, at up to two model calls per ticket: one to triage it and, when a help article matches, one to draft the reply.)
 
 What to look at:
 
@@ -71,7 +71,7 @@ The reference server reads environment variables only (there is no config file o
 |---|---|---|
 | `TRIAGE_DB` | a path on persistent disk, e.g. `/var/lib/support-copilot/triage.db` | the queue and every decision live here; default `./triage.db` |
 | `KB_DIR` | your articles folder | otherwise only the six sample articles are used |
-| `API_KEY` | a long random string | protects the review page and API; every request then needs `X-API-Key` |
+| `API_KEY` | a long random string | protects the review API (`/tickets`, `/outbox`, `/metrics` and the rest): every request then needs `X-API-Key`. The page shell at `/`, `/health`, `/docs`, `/openapi.json` and the webhooks do not need it (the webhooks use their own signature) |
 | `ZENDESK_WEBHOOK_SECRET` / `ZAMMAD_WEBHOOK_SECRET` | the signing secret your helpdesk shows | proves a webhook came from your helpdesk; **approval by tag is refused without it** |
 | `ANTHROPIC_API_KEY` | your key | turns on Claude (model: `TRIAGE_MODEL`) |
 
@@ -91,7 +91,7 @@ python -m support_copilot.doctor --live     # also asks each connected helpdesk 
 python -m support_copilot.doctor --model    # also makes one small call to Claude
 ```
 
-Each line is `ok`, `warn` (it works, but look) or `FAIL` (it will not work), and the exit code is 1 if anything fails. It checks the database, your articles, the model, the API key, each helpdesk's credentials and webhook secret, and what tags will be written. `--live` creates, changes and sends nothing. Fix every `FAIL` before going on.
+Each line is `ok`, `warn` (it works, but look) or `FAIL` (it will not work), and the exit code is 1 if anything fails. It checks the database, your articles, the model, the API key, each helpdesk's credentials and webhook secret, and the tags that will be written (the main ones, and which others appear when they apply). `--live` creates, changes and sends nothing. Fix every `FAIL` before going on.
 
 ## 6. Run the server
 
@@ -154,9 +154,9 @@ curl -s -H "X-API-Key: $API_KEY" localhost:8000/outbox | python -m json.tool | h
 
 The newest entry has `"kind": "triage_note"` and `"mode": "dry_run"`: the request it would have sent. The ticket is in the review page. Nothing changed in the helpdesk.
 
-**Stage 3, shadow.** Add the credentials and restart, then create another ticket. In the helpdesk you now see an **internal** note ("[AI triage - pending human review]") with the category, priority, team, the help article, the suggested reply and how to decide; the tags `ai_triaged`, `ai_cat_...`, `ai_team_...`; and the priority set. The outbox entry says `"mode": "sent"`. The customer sees nothing. If the entry says `"mode": "error"`, its `error` field says why (see the table below).
+**Stage 3, shadow.** Add the credentials and restart, then create another ticket. In the helpdesk you now see an **internal** note ("[AI triage - pending human review]") with the category, priority, team, the help article, the suggested reply and how to decide; the tags `ai_triaged`, `ai_cat_...`, `ai_team_...`; and the priority set (on Zendesk also the ticket type, taken from the category). The outbox entry says `"mode": "sent"`. The customer sees nothing. If the entry says `"mode": "error"`, its `error` field says why (see the table below).
 
-**Stage 4, pilot.** Add the decision trigger and `ALLOWED_REVIEWERS`. As one of those agents, add `ai_approve` to the test ticket. The customer-facing reply appears as a public reply, `/outbox` has a `public_reply`, and the review page shows the ticket approved by that agent's email. Add the tag again, or save the ticket again: nothing more is sent. On another test ticket, add `ai_reject`: no reply, an internal note and the tag `ai_rejected`.
+**Stage 4, pilot.** Add the decision trigger and `ALLOWED_REVIEWERS`. As one of those agents, add `ai_approve` to the test ticket. The customer-facing reply appears as a public reply, `/outbox` has a `public_reply` (on Zendesk the ticket status becomes `pending`), and the review page shows the ticket approved by that agent's email. Add the tag again, or save the ticket again: nothing more is sent. On another test ticket, add `ai_reject`: no reply, an internal note and the tag `ai_rejected`.
 
 ## Turning it off
 

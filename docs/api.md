@@ -22,11 +22,11 @@ These are the routes of `create_router(copilot)` (see the [embedding guide](embe
 | GET | `/metrics/breakdown` | Per category: clean rate, its lower bound, rejections, reasons, automation candidates |
 | GET | `/health` | Liveness, whether the LLM is enabled, which ticket systems are configured |
 
-Set `API_KEY` and send it as `X-API-Key` to protect everything except `/health` and the webhooks (which use each system's own signature). If `API_KEY` is not set the API is open, which is only fine on a local machine.
+Set `API_KEY` and send it as `X-API-Key` to protect the review API: every route except `/health`, the page at `/`, the generated `/docs` and `/openapi.json`, and the webhooks (which use each system's own signature). If `API_KEY` is not set the API is open, which is only fine on a local machine.
 
 ## What the webhook does
 
-- **Signature first.** With the system's webhook secret set, a request without a valid signature gets `401`. A body over 1 MB gets `413` without being read.
+- **Signature first.** With the system's webhook secret set, a request without a valid signature gets `401`. A body over 1 MB gets `413` (refused before it is read when `Content-Length` says so, otherwise right after).
 - **A new ticket** is triaged and queued (`201`, with the triage and the draft). A re-sent webhook is recognised and changes nothing. A long ticket is cut to its first 10,000 characters and a short or empty field is filled in, so a helpdesk is never told to retry something that can be handled (`422` only for a payload that is not a ticket at all).
 - **An update to a ticket already queued** is read for the decision tags. `ai_approve` sends the drafted reply once and `ai_reject` sends nothing; both are recorded under the agent named in the payload. Both tags at once, any other update, a repeat, and a decision from someone not in `allowed_reviewers` change nothing, and the response says why (`ignored`). For a connected system a decision also needs the webhook secret to be set. [Details](integrations.md#deciding-from-inside-the-helpdesk)
 

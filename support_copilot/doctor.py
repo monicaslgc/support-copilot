@@ -98,8 +98,11 @@ def run_checks(cp: Copilot, live: bool = False, model: bool = False, planned_db:
         add("ok", "approval by tag", f"agents add {tx.approve} or {tx.reject}; allowed: {who}")
     else:
         add("ok", "approval by tag", "off: decisions are made in the review page or through the API")
-    add("ok", "tags written", f"{tx.tag('triaged')}, {tx.tag('cat_<category>')}, {tx.tag('team_<team>')} "
-                              f"(and {tx.tag('rejected')} on a rejection)")
+    always = f"{tx.tag('triaged')}, {tx.tag('cat_<category>')}, {tx.tag('team_<team>')}"
+    sometimes = (f"{tx.tag('lang_<code>')}, {tx.tag('sentiment_negative')}, {tx.tag('spike')} and "
+                 f"{tx.tag('possible_duplicate')}")
+    add("ok", "tags written", f"{always} on every ticket; {sometimes} when they apply; "
+                              f"{tx.tag('rejected')} on a rejection")
     return out
 
 

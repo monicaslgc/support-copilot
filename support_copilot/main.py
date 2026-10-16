@@ -14,7 +14,10 @@ from . import llm
 from .api import create_router
 from .copilot import Copilot
 
-copilot = Copilot.from_env()  # TRIAGE_DB (else ./triage.db), KB_DIR, API_KEY, the tag settings: see docs/api.md
+try:
+    copilot = Copilot.from_env()  # TRIAGE_DB (else ./triage.db), KB_DIR, API_KEY, the tag settings: see docs/api.md
+except ValueError as e:  # a setting that cannot work: name it and stop, instead of a traceback
+    raise SystemExit(f"support-copilot cannot start: {e}") from None
 app = FastAPI(title="support-copilot (human-in-the-loop ticket triage)")
 copilot.log_startup_warnings()
 

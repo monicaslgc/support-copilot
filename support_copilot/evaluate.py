@@ -8,7 +8,8 @@
 Each ticket needs `subject` and `body`. `customer` is optional. If a `category` and/or `priority` column holds
 what your agents decided (using our names: bug, billing, access, how_to, feature_request, other; P1 to P4), the
 summary says how often the triage agrees. Nothing is stored or sent anywhere, and no helpdesk is called: with
-ANTHROPIC_API_KEY set, the ticket text (private details masked) goes to Claude, two calls per ticket.
+ANTHROPIC_API_KEY set, the ticket text (private details masked) goes to Claude: up to two calls per
+ticket (one to triage it, one to draft the reply when a help article matches).
 """
 import argparse
 import csv
@@ -105,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     if not rows:
         raise SystemExit(f"{args.tickets}: no tickets")
     if llm.enabled():
-        print(f"Claude is on ({llm.model_name()}): {2 * len(rows)} model calls. Use --rules to avoid them.\n",
+        print(f"Claude is on ({llm.model_name()}): up to {2 * len(rows)} model calls. Use --rules to avoid them.\n",
               file=sys.stderr)
     results = evaluate(rows, Copilot(db=":memory:", kb=args.kb))
     print(summary(results, args.preview))

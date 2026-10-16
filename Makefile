@@ -29,5 +29,5 @@ lint:  ## style, bug and type checks
 check: lint test  ## what CI runs
 
 clean:  ## remove caches and local databases
-	rm -rf .pytest_cache .ruff_cache *.db
+	rm -rf .pytest_cache .ruff_cache .mypy_cache *.db
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

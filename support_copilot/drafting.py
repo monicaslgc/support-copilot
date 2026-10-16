@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -72,9 +73,18 @@ def draft_reply(subject: str, body: str, triage: Triage, articles: list[dict], c
     return draft(subject, body, triage, articles, customer).text
 
 
+def greeting_name(customer: str) -> str:
+    """The name to greet, or "" when there is none worth using: "Rui Costa <rui@example.com>" is greeted as
+    "Rui Costa", and "unknown" or a bare email address (which says nothing a person would call someone) as nobody."""
+    name = re.sub(r"\s*<[^>]*>", "", customer or "").strip().strip("\"'")
+    return "" if not name or name.lower() == "unknown" or "@" in name else name
+
+
 def _template(customer: str, triage: Triage, articles: list[dict]) -> str:
     w = _WORDS.get(triage.language, _WORDS["en"])
-    lines = [w["hi"].format(name=customer), "", w["thanks"]]
+    name = greeting_name(customer)
+    lines = [w["hi"].format(name=name).replace(" ,", ",") if name else w["hi"].replace(" {name}", "").format(), "",
+             w["thanks"]]
     if triage.sentiment is Sentiment.NEGATIVE:
         lines.append(w["sorry"])
     if articles:

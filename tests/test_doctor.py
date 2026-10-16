@@ -149,3 +149,23 @@ def test_the_database_check_follows_where_the_server_will_put_the_file(monkeypat
     assert "[ok  ] database" in capsys.readouterr().out and not (tmp_path / "queue.db").exists()
     monkeypatch.setenv("TRIAGE_DB", str(tmp_path / "missing" / "queue.db"))   # a directory that does not exist
     assert doctor.main([]) == 1 and "[FAIL] database" in capsys.readouterr().out
+
+
+def test_the_tags_line_names_the_tags_that_appear_only_sometimes():
+    line = detail(doctor.run_checks(Copilot()), "tags written")
+    for tag in ("ai_triaged", "ai_cat_<category>", "ai_team_<team>", "ai_lang_<code>", "ai_sentiment_negative",
+                "ai_spike", "ai_possible_duplicate", "ai_rejected"):
+        assert tag in line
+
+
+def test_the_server_refuses_to_start_on_a_bad_setting_and_says_which(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    env = {**os.environ, "CATEGORY_LABELS": "billing", "PYTHONPATH": str(root), "TRIAGE_DB": ":memory:"}
+    done = subprocess.run([sys.executable, "-c", "import support_copilot.main"], cwd=tmp_path, env=env,
+                          capture_output=True, text=True)
+    assert done.returncode == 1 and "Traceback" not in done.stderr
+    assert "cannot start: CATEGORY_LABELS: 'billing' is not name=label" in done.stderr

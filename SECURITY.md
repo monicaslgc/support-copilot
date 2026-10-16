@@ -9,7 +9,7 @@ This is a concept project: it has not been security-reviewed or run against a li
 - The review API can require `X-API-Key` (`API_KEY`).
 - Private details (emails, cards, IBANs, phones, passwords) are masked before text goes to the model.
 - The review page never inserts ticket text as HTML.
-- At startup the app logs a warning for every connected system that has no webhook secret, and when `API_KEY` is unset.
+- At startup the app logs a warning for every connected system that has no webhook secret, and, once a ticket system is connected, when `API_KEY` is unset.
 
 ## Before connecting a real ticket system
 

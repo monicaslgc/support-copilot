@@ -111,7 +111,7 @@ Acceptance criteria:
 
 - When I write in Portuguese, the draft is in Portuguese, with an apology if I am upset.
 - Before the ticket goes to the model, my emails, phone numbers, cards, IBANs and passwords are masked.
-- The stored ticket keeps the original text, and the agent is told what was masked.
+- The stored ticket keeps the original text, and (when Claude is on, the only time anything is sent) the agent is told what was masked.
 
 **See it:** `python scripts/demo.py upset` and `python scripts/demo.py privacy` · **Checked by:** `tests/test_user_stories.py::test_us06_answered_in_my_language_with_my_details_masked` and `tests/test_user_stories.py::test_us06b_an_upset_customer_gets_an_apology_in_their_language`
 
@@ -145,7 +145,7 @@ Acceptance criteria:
 
 ### US-09 — Connect the ticket system without breaking anything
 
-**As** an admin, **I want** signed webhooks that never overwrite my agents' work, **so that** I can switch this on in the live ticket system safely.
+**As** an admin, **I want** signed webhooks that never replace my agents' tags, **so that** I can switch this on in the live ticket system safely.
 
 Acceptance criteria:
 

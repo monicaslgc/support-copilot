@@ -3,7 +3,7 @@
 Payloads and commands you can run against a local server. Start it first (see the [README](../README.md#try-it-with-the-reference-server)):
 
 ```bash
-uvicorn support_copilot.main:app --reload
+TRIAGE_DB=:memory: uvicorn support_copilot.main:app --reload     # an empty queue, so the ticket numbers below match
 ```
 
 Nothing below needs a ticket-system account: without credentials the adapters run in **dry-run**, which records the exact requests they would send under `/outbox` and sends nothing.

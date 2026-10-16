@@ -25,6 +25,8 @@ Guarantees, enforced by the same end-to-end tests for every system:
 | Internal vs public | `ticket_articles` with `internal: true/false` | comment `public: false/true` |
 | Tags | `POST /tags/add` (additive) | `additional_tags` (additive; `tags` would overwrite) |
 
+Besides the notes, the replies and the tags, the add-on changes these fields and nothing else: the **priority** (on the internal note, and again when a reply is approved), and for **Zendesk** also the ticket **type** (from the category, on the internal note) and the **status**, which becomes `pending` when an approved reply is sent. If your agents rely on those fields, test with that in mind.
+
 Every environment variable is listed in [API and configuration](api.md#configuration).
 
 Always set the webhook secret in production; without it the webhook endpoint accepts any caller.
@@ -58,4 +60,4 @@ The Zammad payload and API calls are based on its documentation and should be ve
 2. Trigger on "ticket created" -> notify the webhook (and the tag trigger described above for decisions). Create an API token under Apps and integrations > APIs.
 
 ## Adding another system
-Implement `TicketSystem` (`support_copilot/ticketsystems/base.py`): `verify_webhook`, `parse_webhook`, `post_internal_note`, `post_public_reply`, `post_rejection`, plus `base_url`/auth. Register it in `build_systems()`, or pass it to your own `Copilot(systems={...})`. Add a stateful fake to `tests/fakes.py` with the same read API (`public`, `internal`, `tags`, `priority`) and add it to the `env` fixture params: the whole end-to-end suite then runs against it.
+Implement `TicketSystem` (`support_copilot/ticketsystems/base.py`): `configured` and `base_url` (properties), `verify_webhook`, `parse_webhook`, `post_internal_note`, `post_public_reply` and `post_rejection`, set the `name` and `secret_env` attributes (the name appears in `/webhooks/<name>` and the secret variable is what `doctor` and approval by tag check), and override `auth_headers` or `basic_auth` for your authentication. Optionally set `probe_path` (a read-only GET) and `read_probe` so that `doctor --live` can test the credentials. Register it in `build_systems()`, or pass it to your own `Copilot(systems={...})`. Add a stateful fake to `tests/fakes.py` with the same read API (`public`, `internal`, `tags`, `priority`) and add it to the `env` fixture params: the whole end-to-end suite then runs against it.
