@@ -9,14 +9,14 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
-from . import clusters, feedback, llm
+from . import clusters, feedback, guardrails, llm
 from .classifier import classify
 from .db import connect, now, row_to_ticket
-from .drafting import draft_reply
+from .drafting import draft
 from .kb import KnowledgeBase, tokens
-from .models import Category, Decision, Priority, Review, Sentiment, Status, Suggestion, TicketIn, Triage
+from .models import Category, Decision, Flag, Priority, Review, Sentiment, Status, Suggestion, TicketIn, Triage
 from .ticketsystems import TicketSystem, WebhookError, build_systems
 
 log = logging.getLogger("support_copilot")
@@ -142,10 +142,18 @@ def health():
 def _suggest(t: TicketIn) -> Suggestion:
     triage = classify(t.subject, t.body)
     articles = kb.search(f"{t.subject} {t.body}")
+    d = draft(t.subject, t.body, triage, articles, t.customer)
+    notices = [d.notice] if d.notice else []
+    if llm.enabled():  # the ticket text goes to the model with private details masked: tell the reviewer
+        _, masked = guardrails.redact(f"{t.subject}\n{t.body}")
+        if masked:
+            notices.append(f"Masked before sending to the AI: {guardrails.describe(masked)}.")
     return Suggestion(
         triage=triage,
         articles=[{k: a[k] for k in ("id", "title", "score")} for a in articles],
-        draft_reply=draft_reply(t.subject, t.body, triage, articles, t.customer),
+        draft_reply=d.text,
+        warnings=[Flag(**f) for f in guardrails.find_commitments(d.text)],
+        notices=notices,
     )
 
 
@@ -236,6 +244,9 @@ def _internal_note(s: Suggestion, ctx: dict | None = None) -> str:
         what = f'"{c["topic_title"]}"' if c["topic_title"] else "the same issue"
         lead = "POSSIBLE INCIDENT" if c["kind"] == "spike" else "Related"
         lines.append(f"{lead}: {c['size']} tickets from {c['customers']} customers about {what} in a short window.")
+    if s.warnings:
+        lines.append(f"Check before approving: the draft {guardrails.explain([w.model_dump() for w in s.warnings])}.")
+    lines.extend(s.notices)
     if ctx and ctx.get("history", {}).get("count"):
         h = ctx["history"]
         lines.append(f"Repeat customer: {h['count']} earlier ticket{'s' if h['count'] != 1 else ''}"
@@ -354,7 +365,7 @@ def _apply_review(ticket_id: int, r: Review) -> dict:
                          priority=Priority(final_pri), category=Category(final_cat))
         else:
             sync = _push(system, ext, "rejection_note", system.post_rejection, r.reviewer)
-    return {"id": ticket_id, "status": r.action, "sync": sync}
+    return {"id": ticket_id, "status": r.action, "sync": sync, "warnings": guardrails.find_commitments(final_reply)}
 
 
 @api.post("/tickets/{ticket_id}/review")
@@ -399,6 +410,17 @@ def review_cluster(cluster_id: int, r: Review):
                 raise
             skipped.append(tid)
     return {"cluster": cluster_id, "reviewed": reviewed, "skipped": skipped, "results": results}
+
+
+class ReplyCheck(BaseModel):
+    text: str = Field(max_length=10_000)
+
+
+@api.post("/check-reply")
+def check_reply(body: ReplyCheck):
+    """Promises in a reply a person is about to send (refunds, credits, guarantees, amounts, deadlines)."""
+    flags = guardrails.find_commitments(body.text)
+    return {"warnings": flags, "explanation": guardrails.explain(flags)}
 
 
 @api.get("/metrics")

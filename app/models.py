@@ -67,10 +67,20 @@ class Triage(BaseModel):
     language: str = "und"  # ISO 639-1 code, or "und" when unclear
 
 
+class Flag(BaseModel):
+    """A promise found in a reply: kind (refund, guarantee, benefit, money, deadline) and how serious."""
+
+    kind: str
+    severity: str  # "hard": a person must stand behind it; "soft": may be copied correctly from the KB
+    text: str
+
+
 class Suggestion(BaseModel):
     triage: Triage
     articles: list[dict]
     draft_reply: str
+    warnings: list[Flag] = Field(default_factory=list)  # promises found in the draft
+    notices: list[str] = Field(default_factory=list)  # what the guardrails did, for the reviewer
 
 
 class Review(BaseModel):

@@ -219,6 +219,27 @@ function render() {
   // Once reviewed, show what was actually approved, not the AI's original draft.
   reply.value = pending || !rv ? s.draft_reply : rv.final_reply;
   reply.readOnly = !pending;
+
+  // Promises in the reply (refunds, guarantees, amounts, deadlines): checked on the server so there is one rulebook.
+  let flags = [], armed = false, timer = null;
+  const flagsBox = el("div", { class: "note" });
+  flagsBox.hidden = true;
+  const refreshFlags = async () => {
+    try {
+      const r = await api("/check-reply", { method: "POST", body: JSON.stringify({ text: reply.value }) });
+      flags = r.warnings;
+      flagsBox.hidden = !flags.length;
+      flagsBox.className = flags.some((f) => f.severity === "hard") ? "banner" : "note";
+      flagsBox.textContent = flags.length ? `Check before sending: this reply ${r.explanation}.` : "";
+    } catch { /* the check is a convenience: it must never block a review */ }
+  };
+  reply.addEventListener("input", () => {
+    armed = false;
+    if ($("approve")) $("approve").textContent = "Approve and send";
+    clearTimeout(timer);
+    timer = setTimeout(refreshFlags, 300);
+  });
+  if (pending) refreshFlags();
   const reviewer = el("input", { type: "text", id: "reviewer", "aria-label": "Your name", placeholder: "Your name" });
   try { reviewer.value = localStorage.getItem("reviewer") || ""; } catch { /* optional convenience */ }
 
@@ -278,11 +299,12 @@ function render() {
         field("Confidence", el("div", { text: `${pct(tr.confidence)} · ${tr.source}` })),
         field("Sentiment", el("div", { text: tr.sentiment || "–" })),
         field("Language", el("div", { text: langName(tr.language) }))),
-      el("div", { class: "rationale", text: tr.rationale })),
+      el("div", { class: "rationale", text: tr.rationale }),
+      ...(s.notices || []).map((n) => el("div", { class: "rationale", text: n }))),
     ...(related.children.length ? [related] : []),
     ...(hist.children.length ? [hist] : []),
     el("div", {}, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
-    el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply),
+    el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply, flagsBox),
     ...(pending ? [why] : []),
     pending
       ? el("div", { class: "actions" }, reviewer,
@@ -301,6 +323,12 @@ function render() {
       const name = reviewer.value.trim();
       if (!name) { say("Enter your name first.", "err"); reviewer.focus(); return; }
       try { localStorage.setItem("reviewer", name); } catch { /* optional convenience */ }
+      if (action === "approved" && flags.some((f) => f.severity === "hard") && !armed) {
+        armed = true;
+        $("approve").textContent = "Send anyway";
+        say("This reply makes a promise a person has to stand behind. Click Send anyway to confirm.", "err");
+        return;
+      }
       const body = { action, reviewer: name };
       if (reply.value !== s.draft_reply) body.edited_reply = reply.value;
       if (prio.value !== tr.priority) body.final_priority = prio.value;
