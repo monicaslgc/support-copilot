@@ -46,10 +46,18 @@ def test_every_relative_link_and_anchor_resolves(doc):
             assert anchor in headings(dest), f"{doc.name}: {target} has no matching heading in {dest.name}"
 
 
+@pytest.mark.parametrize("doc", DOC_FILES, ids=lambda p: p.name)
+def test_every_html_image_in_the_docs_exists(doc):
+    for src in re.findall(r'<img[^>]+src="([^"]+)"', doc.read_text(encoding="utf-8")):
+        assert (doc.parent / src).exists(), f"{doc.name}: {src} points to a missing file"
+
+
 def test_no_screenshot_is_orphaned():
     used = {(doc.parent / t.partition("#")[0]).resolve() for doc in DOC_FILES for t in links(doc)
             if not re.match(r"(https?:|mailto:)", t)}
-    orphans = [p.name for p in sorted((ROOT / "docs").glob("*.png")) if p.resolve() not in used]
+    used |= {(doc.parent / src).resolve() for doc in DOC_FILES
+             for src in re.findall(r'<img[^>]+src="([^"]+)"', doc.read_text(encoding="utf-8"))}
+    orphans = [p.name for p in sorted((ROOT / "docs" / "images").glob("*.png")) if p.resolve() not in used]
     assert orphans == [], f"images no document uses: {orphans}"
 
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-SAMPLES = Path(__file__).resolve().parent.parent / "data" / "sample_tickets.json"
+SAMPLES = Path(__file__).resolve().parent.parent / "examples" / "sample_tickets.json"
 
 
 def main() -> None:

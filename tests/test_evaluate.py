@@ -31,7 +31,7 @@ def write_csv(path, rows):
 
 
 def test_the_sample_tickets_are_summarised(capsys):
-    assert evaluate.main([str(ROOT / "data" / "sample_tickets.json")]) == 0
+    assert evaluate.main([str(ROOT / "examples" / "sample_tickets.json")]) == 0
     out = capsys.readouterr().out
     assert "6 tickets, triaged by rules" in out and "by category:" in out and "by priority:" in out
     assert "a help article was found for" in out and "the first 3 drafts:" in out

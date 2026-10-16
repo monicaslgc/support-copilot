@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from support_copilot import main
 from tests.fakes import FakeZammad, FakeZendesk
 
-SAMPLES = json.loads((Path(__file__).parent.parent / "data" / "sample_tickets.json").read_text())
+SAMPLES = json.loads((Path(__file__).parent.parent / "examples" / "sample_tickets.json").read_text())
 
 
 class Env:

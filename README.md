@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml/badge.svg)](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml) ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-153D32) ![MIT licence](https://img.shields.io/badge/licence-MIT-A0B3A0) ![Status: concept](https://img.shields.io/badge/status-concept%20%2F%20portfolio-202A27)
 
-![support-copilot: AI-assisted support, human-approved decisions. A review page with the AI's draft and a separate human decision panel.](docs/social-preview.png)
+![support-copilot: AI-assisted support, human-approved decisions. A review page with the AI's draft and a separate human decision panel.](docs/images/social-preview.png)
 
 **An add-on for the support setup you already have, not another app to adopt.** It listens to your helpdesk (Zendesk, Zammad or your own), triages each ticket, drafts a reply in the customer's language from your help articles, and writes the result back as an internal note and tags your own triggers can route on. **A person approves every message before it reaches the customer**, by tagging the ticket in the helpdesk they already use, and the add-on measures where the AI has earned more trust. It is a Python library with an optional FastAPI router and an optional review page: bring your own ticket system, help articles, database file and tag names.
 
@@ -42,26 +42,26 @@ Twelve [user stories](docs/user-stories.md) (support agents, support leads, admi
 
 ## See it in action
 
-<p align="center"><img src="docs/review-queue.png" width="760" alt="The review page: the customer's ticket, the AI's triage and draft in sage panels, and a separate bordered Your decision panel with Approve and Reject."></p>
+<p align="center"><img src="docs/images/review-queue.png" width="760" alt="The review page: the customer's ticket, the AI's triage and draft in sage panels, and a separate bordered Your decision panel with Approve and Reject."></p>
 <p align="center"><em>The review page (synthetic demo data). Ticket, AI suggestion and human decision are three visibly different things.</em></p>
 
 | An outage becomes one incident | A promise gets a warning |
 |---|---|
-| <img src="docs/incident-spike.png" alt="Four P1 tickets grouped as a possible incident, with an Approve for all 4 pending button."> | <img src="docs/guardrails.png" alt="Private details masked before the model, and a warning on a reply that promises a refund."> |
+| <img src="docs/images/incident-spike.png" alt="Four P1 tickets grouped as a possible incident, with an Approve for all 4 pending button."> | <img src="docs/images/guardrails.png" alt="Private details masked before the model, and a warning on a reply that promises a refund."> |
 | Four customers report the same problem; one click answers them all. | What was masked, and a warning on a refund promise (shown with a stub model). |
 
 | Customer context | Where the AI has earned trust |
 |---|---|
-| <img src="docs/customer-context.png" alt="An upset Portuguese-speaking customer with earlier tickets and a Portuguese draft."> | <img src="docs/insights.png" alt="Clean rate per category with a confidence lower bound, and the reasons people corrected the AI."> |
+| <img src="docs/images/customer-context.png" alt="An upset Portuguese-speaking customer with earlier tickets and a Portuguese draft."> | <img src="docs/images/insights.png" alt="Clean rate per category with a confidence lower bound, and the reasons people corrected the AI."> |
 | Sentiment, language, earlier tickets, and a draft in the customer's language. | Per category, with a confidence bound. Synthetic demo reviews. |
 
-<img src="docs/mobile-dark.png" width="300" align="right" alt="The review page on a phone in dark mode, ending with the decision panel."> The page is responsive, supports dark mode and keyboard use, and keeps the decision panel at the end of every ticket, on a phone too. Colour is never the only signal: approved and rejected tickets carry a written status.
+<img src="docs/images/mobile-dark.png" width="300" align="right" alt="The review page on a phone in dark mode, ending with the decision panel."> The page is responsive, supports dark mode and keyboard use, and keeps the decision panel at the end of every ticket, on a phone too. Colour is never the only signal: approved and rejected tickets carry a written status.
 
 <br clear="right">
 
 ## How it works
 
-![Architecture: a ticket arrives, private data is masked, it is triaged, a reply is drafted and checked, a person decides, in the helpdesk by tagging the ticket or in the review page, and only then the customer is answered; the decision feeds per-category metrics](docs/architecture.png)
+![Architecture: a ticket arrives, private data is masked, it is triaged, a reply is drafted and checked, a person decides, in the helpdesk by tagging the ticket or in the review page, and only then the customer is answered; the decision feeds per-category metrics](docs/images/architecture.png)
 
 1. **A ticket is created** in your helpdesk, which calls the webhook (signed, and idempotent if it is re-sent).
 2. **The add-on masks, triages, drafts and checks,** and writes back an internal note and your own tags. The customer sees nothing.
@@ -77,17 +77,15 @@ Twelve [user stories](docs/user-stories.md) (support agents, support leads, admi
 
 ## How it is validated
 
-- **439 tests** on Python 3.11, 3.12 and 3.13, with `ruff`, in CI, plus a job that builds the wheel and uses it in a clean environment. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's colour tokens, contrast ratios and approval controls.
+- **451 tests** on Python 3.11, 3.12 and 3.13, with `ruff`, in CI, plus a job that builds the wheel and uses it in a clean environment. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's colour tokens, contrast ratios and approval controls.
 - **User stories are executable:** each of the twelve stories has an acceptance test, and a test fails if a story, its test or its demo scenario drifts apart.
-- **Mutation-checked:** I broke the code on purpose in dozens of ways (a swapped public and internal note, overwritten tags, a missing idempotency check, a promise let through) and made sure a test failed each time. Several did not at first, and each of those got a new test.
-- **Driven in a real browser** (Chromium) for the approve, reject and bulk flows and a hostile ticket that must show as text. That run is manual, not part of CI.
-- **Measured:** saving a ticket stays at about 6.5 ms from 100 to 2000 tickets in an hour. [Engineering notes](docs/engineering.md).
+- **Mutation-checked, driven in a browser, measured:** I broke the code on purpose in dozens of ways and made sure a test failed each time (several did not at first, and each got a new test). The review page was driven in Chromium by hand, and saving a ticket stays at about 6.5 ms from 100 to 2000 tickets in an hour. [Engineering notes](docs/engineering.md).
 
 ## What is verified
 
 | Area | State |
 |---|---|
-| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (439 tests, synthetic data) |
+| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (451 tests, synthetic data) |
 | Library API and FastAPI router (`Copilot`, `create_router`) | **Implemented and tested offline;** CI installs the built wheel in a clean environment and runs the library example |
 | Approving by tag in the helpdesk, your own tags and names | **Prototyped:** tested against stateful fakes of Zammad and Zendesk, including the webhook payloads that carry the tags and the acting agent |
 | Zammad and Zendesk adapters | **Prototyped:** tested against stateful fakes only, never a live instance |
@@ -124,22 +122,27 @@ pip install -e ".[dev]"   # or: make install
 uvicorn support_copilot.main:app --reload          # review page at http://127.0.0.1:8000/
 python scripts/seed_demo.py            # in another terminal: loads sample tickets
 python scripts/demo.py all             # plays the user stories against the server and checks each outcome
-pytest                                 # 439 tests, offline
+pytest                                 # 451 tests, offline
 ```
 
 `scripts/demo.py list` shows the scenarios. [`examples/`](examples/README.md) has ready-made Zammad and Zendesk payloads and the `curl` commands to send them, including signed ones and the approve-by-tag update. To use Claude, set `ANTHROPIC_API_KEY` (the model is `TRIAGE_MODEL`). To connect Zammad or Zendesk, see [integrations](docs/integrations.md). Every setting is in [API and configuration](docs/api.md).
 
 ## Documentation
 
-- [User stories](docs/user-stories.md): who needs what, with acceptance criteria, each checked by a test
+**Run it**
 - [Run it against your environment](docs/getting-started.md): install, configure, check, connect, verify, troubleshoot
+- [Ticket system integrations](docs/integrations.md): Zammad, Zendesk, approving by tag, adding another system
 - [Embedding guide](docs/embedding.md): your own articles, database, API key, tags and ticket systems
-- [Examples](examples/README.md): payloads and `curl` commands for Zammad and Zendesk
-- [Features in detail](docs/features.md): the review page, Claude or rules, incidents, customer context, feedback, guardrails
-- [Ticket system integrations](docs/integrations.md): Zammad, Zendesk, adding another system
 - [API and configuration](docs/api.md): every route and every environment variable
+- [Examples](examples/README.md): payloads and `curl` commands for Zammad and Zendesk, and the sample tickets
+
+**Understand it**
+- [Features in detail](docs/features.md): the review page, Claude or rules, incidents, customer context, feedback, guardrails
+- [User stories](docs/user-stories.md): who needs what, with acceptance criteria, each checked by a test
 - [Engineering notes](docs/engineering.md): tests and performance
-- [Limitations and next steps](docs/limitations.md)
+
+**Know its limits**
+- [Limitations and next steps](docs/limitations.md), and [SECURITY](SECURITY.md) before connecting real customer data
 
 ## Built with
 

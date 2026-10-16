@@ -20,8 +20,12 @@ No API key or ticket-system account is needed for any of it.
 | `support_copilot/api.py` | The FastAPI router over a `Copilot`; `main.py` is the reference server around it |
 | `support_copilot/ticketsystems/` | One adapter per ticket system behind a shared interface |
 | `support_copilot/{classifier,drafting,guardrails,clusters,feedback,llm}.py` | The rules and the model calls |
+| `support_copilot/{doctor,evaluate}.py` | The two commands implementers run: check a configuration, and triage an export of their tickets |
+| `support_copilot/static/` | The optional review page (one HTML file) and its fonts |
 | `tests/` | Offline tests: stateful fakes of the ticket systems, a fake Anthropic SDK |
-| `docs/` | Documentation; `tests/test_docs.py` checks its links and the numbers it quotes |
+| `docs/`, `docs/images/` | Documentation and its screenshots; `tests/test_docs.py` checks its links, images, settings and the numbers it quotes |
+| `examples/` | Payloads, `curl` commands, the sample tickets and two runnable examples (library and embedded router) |
+| `scripts/` | `demo.py` plays the user stories against a server; `seed_demo.py` loads the sample tickets |
 
 ## Ground rules
 
