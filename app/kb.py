@@ -16,8 +16,14 @@ _STOP = set(
 )
 
 
+def _stem(token: str) -> str:
+    """Fold simple plurals (invoices -> invoice) so a question matches the article's wording.
+    Applied to both sides, so odd results (e.g. 'process' keeps its s) still match consistently."""
+    return token[:-1] if len(token) > 4 and token.endswith("s") and not token.endswith("ss") else token
+
+
 def _tokens(text: str) -> list[str]:
-    return [t for t in re.findall(r"\w+", text.lower()) if t not in _STOP and len(t) > 2]
+    return [_stem(t) for t in re.findall(r"\w+", text.lower()) if t not in _STOP and len(t) > 2]
 
 
 class KnowledgeBase:
@@ -31,7 +37,9 @@ class KnowledgeBase:
         df = Counter(t for d in self.docs for t in d["tf"])
         self.idf = {t: math.log((1 + n) / (1 + c)) + 1 for t, c in df.items()}
 
-    def search(self, query: str, k: int = 3, min_score: float = 0.1) -> list[dict]:
+    def search(self, query: str, k: int = 3, min_score: float = 0.1, relative: float = 0.35) -> list[dict]:
+        """Top-k articles. Besides the absolute floor, drop anything scoring under `relative` x the best match,
+        so one clear hit is not listed next to weak coincidental ones."""
         q = Counter(_tokens(query))
         results = []
         for d in self.docs:
@@ -40,4 +48,7 @@ class KnowledgeBase:
             score /= norm
             if score >= min_score:
                 results.append({"id": d["id"], "title": d["title"], "score": round(score, 3), "text": d["text"]})
-        return sorted(results, key=lambda r: r["score"], reverse=True)[:k]
+        results = sorted(results, key=lambda r: r["score"], reverse=True)
+        if results:
+            results = [r for r in results if r["score"] >= relative * results[0]["score"]]
+        return results[:k]

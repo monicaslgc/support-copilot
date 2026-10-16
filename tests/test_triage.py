@@ -39,6 +39,24 @@ def test_kb_retrieval():
     assert kb.search("it would be nice to add dark mode") == []
 
 
+def test_kb_drops_weak_matches_next_to_a_clear_hit():
+    kb = KnowledgeBase()
+    outage = kb.search("Platform is down. Nobody on my team can access anything, total outage since 9am.")
+    assert [a["id"] for a in outage] == ["service-outage"]
+    export_q = "How to export a report? How do I export the monthly report to CSV?"
+    assert [a["id"] for a in kb.search(export_q)] == ["export-report"]
+    # but a genuinely mixed question still returns both articles
+    both = kb.search("forgot my password and also need the invoice for the refund")
+    assert {"reset-password", "invoices"} <= {a["id"] for a in both}
+    assert len(kb.search("password invoice refund", relative=0)) >= len(kb.search("password invoice refund"))
+
+
+def test_kb_matches_singular_and_plural_forms():
+    kb = KnowledgeBase()
+    assert kb.search("my invoice and the refund")[0]["id"] == "invoices"      # article says invoices / refunds
+    assert kb.search("user permission")[0]["id"] == "user-permissions"
+
+
 def test_full_flow_and_metrics():
     c = TestClient(app)
     r = c.post("/tickets", json={"subject": "Duplicate charge", "body": "refund my invoice please", "customer": "Sam"})

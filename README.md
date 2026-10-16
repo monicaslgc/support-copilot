@@ -7,6 +7,22 @@ It plugs into ticket systems through a small adapter interface. Two adapters shi
 
 > **Status: concept / portfolio project**, built from scratch with synthetic data. Both adapters follow the vendors' documented API and webhook shapes, but have only been tested against stateful fakes of those APIs, **not against a live Zendesk or Zammad instance**. Without credentials they run in dry-run mode.
 
+## What it looks like
+
+A review queue sorted by urgency. The reviewer sees the customer's message, the AI's triage (priority and category can be overridden), the knowledge-base articles it used and an editable draft reply. Nothing is sent until someone approves.
+
+![Review queue](docs/review-queue.png)
+
+After a decision the queue updates and the metrics show how often humans agree with the AI. Here the reviewer rewrote the reply and raised the priority, so priority agreement is 0%.
+
+![After approving a ticket](docs/after-approval.png)
+
+Reviewed tickets show the reply that was actually approved, not the AI's original draft. The page also works on a phone and in dark mode.
+
+| Approved ticket | Mobile, dark mode |
+|---|---|
+| ![Approved ticket](docs/approved-view.png) | ![Mobile dark mode](docs/mobile-dark.png) |
+
 ## Why human-in-the-loop
 
 The companion project, [agent-triage-kit](https://github.com/monicaslgc/agent-triage-kit), explores the opposite end: agents that resolve tickets on their own once confidence clears a threshold. This project explores the other side of the same question: when the AI should only suggest, and how you measure whether it has earned more autonomy.
@@ -21,7 +37,8 @@ ticket -> classify (LLM or rules) -> RAG over KB -> draft reply -> review queue 
 
 ```bash
 pip install -r requirements.txt
-uvicorn app.main:app --reload     # interactive docs at http://127.0.0.1:8000/docs
+uvicorn app.main:app --reload     # review UI at http://127.0.0.1:8000/  ·  API docs at /docs
+python scripts/seed_demo.py       # load the sample tickets so there is something to review
 pytest
 ```
 
@@ -38,8 +55,9 @@ Without credentials the app classifies with keyword rules (offline, deterministi
 
 | Method | Route | Purpose |
 |---|---|---|
+| GET | `/` | The review queue page (no data of its own: it calls the API below) |
 | POST | `/tickets` | Triage a ticket and draft a reply (stays `pending_review`) |
-| GET | `/tickets?status=` | Review queue, most urgent first |
+| GET | `/tickets?status=` | Review queue, most urgent first. Reviewed tickets include a `review` with the human's decision and the reply that was sent |
 | POST | `/tickets/{id}/review` | Human approves or rejects; can correct priority, category and reply |
 | POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`) |
 | GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`) |
@@ -96,7 +114,7 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 
 ## Tests
 
-79 tests, run on Python 3.11 and 3.12 in CI together with `ruff`.
+83 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
@@ -108,7 +126,7 @@ I checked that the tests catch real bugs by breaking the code on purpose, 20+ wa
 ## Known limitations
 
 - Not verified against live Zammad or Zendesk instances (see status above).
-- Retrieval is TF-IDF over four sample articles, so it returns occasional irrelevant matches. Embeddings (for example pgvector) are the next step.
+- Retrieval is TF-IDF over six sample articles, with plural folding and a cutoff relative to the best match. It is lexical: it does not understand synonyms, so a differently worded question can miss the right article. Embeddings (for example pgvector) are the next step.
 - Rule-based classification is a baseline, not a production classifier.
 - No automatic retry for failed ticket-system calls; no check on webhook timestamp age.
 - A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.

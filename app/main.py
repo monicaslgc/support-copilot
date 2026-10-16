@@ -3,9 +3,11 @@ import json
 import logging
 import os
 import threading
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from . import llm
@@ -40,6 +42,20 @@ def _one(sql: str, params: tuple = ()):
         return conn.execute(sql, params).fetchone()
 
 
+def _attach_reviews(tickets: list[dict]) -> list[dict]:
+    """Add `review` (what the human decided and the reply that was actually approved) to each ticket."""
+    ids = [t["id"] for t in tickets]
+    by_ticket = {}
+    if ids:
+        marks = ",".join("?" * len(ids))
+        for r in _all(f"SELECT ticket_id, reviewer, action, final_category, final_priority, final_reply, created_at"
+                      f" FROM reviews WHERE ticket_id IN ({marks})", tuple(ids)):
+            by_ticket[r["ticket_id"]] = {k: r[k] for k in r.keys() if k != "ticket_id"}
+    for t in tickets:
+        t["review"] = by_ticket.get(t["id"])
+    return tickets
+
+
 def require_api_key(x_api_key: str | None = Header(default=None)):
     """Protects the review/ops API. Webhooks are authenticated by each system's own signature instead.
 
@@ -51,6 +67,12 @@ def require_api_key(x_api_key: str | None = Header(default=None)):
 
 
 api = APIRouter(dependencies=[Depends(require_api_key)])
+
+
+@app.get("/", include_in_schema=False)
+def review_ui():
+    """The review queue page. It holds no data itself: it calls the (API-key protected) API."""
+    return FileResponse(Path(__file__).parent / "static" / "index.html")
 
 
 @app.get("/health")
@@ -165,7 +187,7 @@ def list_tickets(status: Status | None = None, limit: int = Query(100, ge=1, le=
     rows = _all(q, (status.value,) if status else ())
     tickets = [row_to_ticket(r) for r in rows]
     tickets.sort(key=lambda t: (t["suggestion"]["triage"]["priority"], t["created_at"]))
-    return tickets[:limit]
+    return _attach_reviews(tickets[:limit])
 
 
 @api.get("/tickets/{ticket_id}")
@@ -173,7 +195,7 @@ def get_ticket(ticket_id: int):
     row = _one("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
     if not row:
         raise HTTPException(404, "ticket not found")
-    return row_to_ticket(row)
+    return _attach_reviews([row_to_ticket(row)])[0]
 
 
 @api.post("/tickets/{ticket_id}/review")

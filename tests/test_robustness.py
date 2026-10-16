@@ -136,3 +136,24 @@ def test_list_limit_and_validation():
     assert len(c.get("/tickets", params={"limit": 2}).json()) == 2
     assert c.get("/tickets", params={"limit": 0}).status_code == 422
     assert c.get("/outbox", params={"limit": 9999}).status_code == 422
+
+
+def test_reviewed_tickets_expose_what_was_actually_decided():
+    c = TestClient(main.app)
+    tid = c.post("/tickets", json={"subject": "Duplicate charge", "body": "refund my invoice"}).json()["id"]
+    assert c.get(f"/tickets/{tid}").json()["review"] is None
+    c.post(f"/tickets/{tid}/review", json={"action": "approved", "reviewer": "monica", "final_priority": "P1",
+                                            "edited_reply": "Edited by a human."})
+    t = c.get(f"/tickets/{tid}").json()
+    assert t["review"]["final_reply"] == "Edited by a human." and t["review"]["reviewer"] == "monica"
+    assert t["review"]["final_priority"] == "P1" and t["suggestion"]["triage"]["priority"] == "P3"
+    assert t["suggestion"]["draft_reply"] != "Edited by a human."            # the AI draft is kept as it was
+    listed = c.get("/tickets", params={"status": "approved"}).json()
+    assert [x["review"]["final_reply"] for x in listed] == ["Edited by a human."]
+
+
+def test_review_ui_page_is_served_and_never_injects_html():
+    r = TestClient(main.app).get("/")
+    assert r.status_code == 200 and "text/html" in r.headers["content-type"] and "Review queue" in r.text
+    for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval("):
+        assert sink not in r.text, f"ticket text is customer-controlled: {sink} would make it an XSS sink"

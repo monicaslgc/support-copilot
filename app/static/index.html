@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review queue</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5d6778; --line: #dfe3ea;
+  --accent: #2f5bd8; --accent-ink: #ffffff; --ok: #1b7a46; --bad: #b3261e;
+  --p1: #b3261e; --p2: #b25a00; --p3: #2f5bd8; --p4: #5d6778; --focus: #2f5bd8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --panel: #1a202a; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2b3342;
+    --accent: #7a9bff; --accent-ink: #0c1220; --ok: #5fcf8f; --bad: #ff8a80;
+    --p1: #ff8a80; --p2: #ffb066; --p3: #7a9bff; --p4: #9aa5b8; --focus: #7a9bff;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 17px; margin: 0; }
+.metrics { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-left: auto; }
+.metric { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
+.metric b { font-size: 17px; color: var(--ink); font-variant-numeric: tabular-nums; }
+main { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; padding: 16px; max-width: 1200px; margin: 0 auto; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.list-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.list-head h2 { font-size: 14px; margin: 0; }
+select, input, textarea, button { font: inherit; color: inherit; }
+select, input[type=text], input[type=password], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+textarea { width: 100%; min-height: 200px; resize: vertical; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+ul { list-style: none; margin: 0; padding: 0; }
+.item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 10px 12px; cursor: pointer; }
+.item:last-child { border-bottom: 0; }
+.item[aria-current=true] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.item .subj { font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .sub { color: var(--muted); font-size: 13px; }
+.chip { display: inline-block; font-size: 12px; font-weight: 700; border: 1.5px solid currentColor; border-radius: 999px; padding: 0 8px; margin-right: 6px; }
+.P1 { color: var(--p1); } .P2 { color: var(--p2); } .P3 { color: var(--p3); } .P4 { color: var(--p4); }
+.detail { padding: 16px; display: grid; gap: 16px; }
+.empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
+.msg { white-space: pre-wrap; background: var(--bg); border-radius: 8px; padding: 10px 12px; margin: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.field label { display: block; font-size: 12px; color: var(--muted); }
+.field div, .field select { margin-top: 2px; }
+.rationale { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.tag { font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.primary, button.danger { border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.danger { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); }
+button:disabled { opacity: .5; cursor: default; }
+.note { font-size: 13px; color: var(--muted); }
+#flash { max-width: 1200px; margin: 12px auto 0; padding: 8px 16px 0; font-size: 14px; font-weight: 600; }
+#flash:empty { display: none; }
+#flash.ok { color: var(--ok); } #flash.err { color: var(--bad); }
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <h1>support-copilot <span class="note">review queue</span></h1>
+  <div class="metrics" id="metrics" aria-live="polite"></div>
+</header>
+<div id="flash" role="status" aria-live="polite"></div>
+<main>
+  <section class="panel" aria-label="Tickets">
+    <div class="list-head">
+      <h2>Tickets</h2>
+      <label class="note">Show
+        <select id="filter">
+          <option value="pending_review">pending review</option>
+          <option value="approved">approved</option>
+          <option value="rejected">rejected</option>
+        </select>
+      </label>
+    </div>
+    <ul id="list"></ul>
+  </section>
+  <section class="panel" id="detail" aria-label="Ticket detail"></section>
+</main>
+<dialog id="keydlg">
+  <form method="dialog">
+    <p>This server requires an API key.</p>
+    <input type="password" id="keyin" aria-label="API key" autocomplete="off">
+    <button class="primary" value="ok">Continue</button>
+  </form>
+</dialog>
+
+<script>
+// Ticket text comes from customers: it is only ever inserted with textContent, never as HTML.
+const $ = (id) => document.getElementById(id);
+const CATS = ["bug", "billing", "access", "how_to", "feature_request", "other"];
+const PRIOS = ["P1", "P2", "P3", "P4"];
+let tickets = [], selected = null;
+
+// Feedback lives outside the detail pane so it survives the re-render that follows a decision.
+function say(msg, cls = "") { const f = $("flash"); f.className = cls; f.textContent = msg; }
+
+function key() { try { return sessionStorage.getItem("apiKey") || ""; } catch { return ""; } }
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json", ...(key() ? { "X-API-Key": key() } : {}) };
+  const r = await fetch(path, { ...opts, headers });
+  if (r.status === 401) {
+    $("keyin").value = "";
+    await new Promise((res) => { $("keydlg").addEventListener("close", res, { once: true }); $("keydlg").showModal(); });
+    try { sessionStorage.setItem("apiKey", $("keyin").value); } catch { /* storage unavailable: key lasts for this call only */ }
+    return api(path, opts);
+  }
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : `HTTP ${r.status}`);
+  return body;
+}
+
+function el(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  kids.forEach((c) => e.append(c));
+  return e;
+}
+const chip = (p) => el("span", { class: `chip ${p}`, text: p });
+const pct = (v) => (v === undefined ? "–" : `${Math.round(v * 100)}%`);
+
+async function loadMetrics() {
+  const m = await api("/metrics");
+  const box = $("metrics");
+  box.replaceChildren();
+  const add = (label, value) => box.append(el("div", { class: "metric" }, el("b", { text: value }), el("span", { text: label })));
+  add("reviewed", String(m.reviewed));
+  if (m.reviewed) {
+    add("category agreement", pct(m.category_agreement));
+    add("priority agreement", pct(m.priority_agreement));
+    add("replies edited", pct(m.reply_edit_rate));
+  }
+}
+
+async function loadList() {
+  tickets = await api(`/tickets?status=${$("filter").value}`);
+  const ul = $("list");
+  ul.replaceChildren();
+  if (!tickets.length) ul.append(el("li", { class: "empty", text: "Nothing here." }));
+  for (const t of tickets) {
+    const tr = t.suggestion.triage;
+    const b = el("button", { class: "item", type: "button", "aria-current": String(selected === t.id) },
+      el("span", { class: "subj", text: t.subject }),
+      el("span", { class: "sub" }, chip(tr.priority), document.createTextNode(`${tr.category} · ${t.customer}`)));
+    b.addEventListener("click", () => { selected = t.id; say(""); render(); });
+    ul.append(el("li", {}, b));
+  }
+  if (!tickets.some((t) => t.id === selected)) selected = tickets[0]?.id ?? null;
+  render();
+}
+
+function render() {
+  document.querySelectorAll("#list .item").forEach((b, i) => b.setAttribute("aria-current", String(tickets[i]?.id === selected)));
+  const d = $("detail");
+  d.replaceChildren();
+  const t = tickets.find((x) => x.id === selected);
+  if (!t) { d.append(el("div", { class: "empty", text: "Select a ticket to review." })); return; }
+  const s = t.suggestion, tr = s.triage, pending = t.status === "pending_review";
+  const rv = t.review;
+
+  const prio = el("select", { id: "prio", "aria-label": "Priority" });
+  PRIOS.forEach((p) => prio.append(el("option", { value: p, text: p })));
+  prio.value = tr.priority;
+  const cat = el("select", { id: "cat", "aria-label": "Category" });
+  CATS.forEach((c) => cat.append(el("option", { value: c, text: c })));
+  cat.value = tr.category;
+  if (rv) { prio.value = rv.final_priority; cat.value = rv.final_category; }
+  prio.disabled = cat.disabled = !pending;
+
+  const reply = el("textarea", { id: "reply", "aria-label": "Reply to the customer" });
+  // Once reviewed, show what was actually approved, not the AI's original draft.
+  reply.value = pending || !rv ? s.draft_reply : rv.final_reply;
+  reply.readOnly = !pending;
+  const reviewer = el("input", { type: "text", id: "reviewer", "aria-label": "Your name", placeholder: "Your name" });
+  try { reviewer.value = localStorage.getItem("reviewer") || ""; } catch { /* optional convenience */ }
+
+  const field = (label, node) => el("div", { class: "field" }, el("label", { text: label }), node);
+  const arts = s.articles.length
+    ? s.articles.map((a) => el("span", { class: "tag", text: a.title }))
+    : [el("span", { class: "note", text: "No matching article" })];
+
+  d.append(el("div", { class: "detail" },
+    el("div", {}, el("h3", { text: `Ticket #${t.id}${t.system ? ` · ${t.system} ${t.external_id}` : ""}` }),
+      el("strong", { text: t.subject }), el("p", { class: "msg", text: t.body }),
+      el("div", { class: "note", text: `From ${t.customer}` })),
+    el("div", {}, el("h3", { text: "AI triage" }),
+      el("div", { class: "grid" }, field("Priority", prio), field("Category", cat),
+        field("Team", el("div", { text: tr.team })),
+        field("Confidence", el("div", { text: `${pct(tr.confidence)} · ${tr.source}` }))),
+      el("div", { class: "rationale", text: tr.rationale })),
+    el("div", {}, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
+    el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply),
+    pending
+      ? el("div", { class: "actions" }, reviewer,
+          Object.assign(el("button", { class: "primary", type: "button", id: "approve", text: "Approve and send" }), {}),
+          el("button", { class: "danger", type: "button", id: "reject", text: "Reject" }),
+          el("span", { class: "note", text: "Nothing reaches the customer until you approve." }))
+      : el("div", { class: "note", text: rv
+          ? `${t.status[0].toUpperCase()}${t.status.slice(1)} by ${rv.reviewer} on ${rv.created_at.slice(0, 10)}. `
+            + `AI suggested ${tr.priority} / ${tr.category}${rv.final_reply === s.draft_reply ? "" : "; reply was edited"}.`
+          : `This ticket was ${t.status}.` })));
+
+  if (pending) {
+    const decide = async (action) => {
+      const name = reviewer.value.trim();
+      if (!name) { say("Enter your name first.", "err"); reviewer.focus(); return; }
+      try { localStorage.setItem("reviewer", name); } catch { /* optional convenience */ }
+      const body = { action, reviewer: name };
+      if (reply.value !== s.draft_reply) body.edited_reply = reply.value;
+      if (prio.value !== tr.priority) body.final_priority = prio.value;
+      if (cat.value !== tr.category) body.final_category = cat.value;
+      $("approve").disabled = $("reject").disabled = true;
+      try {
+        const res = await api(`/tickets/${t.id}/review`, { method: "POST", body: JSON.stringify(body) });
+        const sync = res.sync ? ` (${res.sync.replace("_", " ")} in the ticket system)` : "";
+        say(`Ticket #${t.id} ${action}${sync}.`, "ok");
+        await Promise.all([loadMetrics(), loadList()]);
+      } catch (e) {
+        say(e.message, "err");
+        $("approve").disabled = $("reject").disabled = false;
+      }
+    };
+    $("approve").addEventListener("click", () => decide("approved"));
+    $("reject").addEventListener("click", () => decide("rejected"));
+  }
+}
+
+$("filter").addEventListener("change", () => { selected = null; say(""); loadList(); });
+Promise.all([loadMetrics(), loadList()]).catch((e) => { $("detail").replaceChildren(el("div", { class: "empty", text: e.message })); });
+</script>
+</body>
+</html>
