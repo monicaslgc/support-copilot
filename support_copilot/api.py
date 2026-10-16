@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-from .copilot import Copilot, CopilotError
+from .copilot import MAX_WEBHOOK_BYTES, Copilot, CopilotError
 from .models import Review, Status, TicketIn
 
 
@@ -99,6 +99,9 @@ def create_router(cp: Copilot) -> APIRouter:
     @router.post("/webhooks/{system_name}", status_code=201, tags=["webhooks"])
     async def ticket_system_webhook(system_name: str, request: Request):
         """Inbound webhook from a ticket system (zendesk, zammad). Configure it on 'ticket created'."""
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > MAX_WEBHOOK_BYTES:  # refuse before reading it into memory
+            raise HTTPException(413, "webhook body too large")
         raw = await request.body()
         try:
             # The model and ticket-system calls block for seconds: keep them off the event loop.

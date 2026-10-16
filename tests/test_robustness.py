@@ -157,3 +157,66 @@ def test_review_ui_page_is_served_and_never_injects_html():
     assert r.status_code == 200 and "text/html" in r.headers["content-type"] and "Review queue" in r.text
     for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval("):
         assert sink not in r.text, f"ticket text is customer-controlled: {sink} would make it an XSS sink"
+
+
+def test_an_oversized_webhook_is_refused_before_its_body_is_read(monkeypatch):
+    from starlette.requests import Request
+
+    async def never(self):
+        raise AssertionError("the body must not be read once the declared length is too big")
+
+    monkeypatch.setattr(Request, "body", never)
+    r = TestClient(main.app).post("/webhooks/zendesk", content=b"x" * 1_000_001)
+    assert r.status_code == 413
+
+
+# ---------------- what a helpdesk sends is fitted, not refused: a refused webhook is retried and never triaged
+def test_a_very_long_ticket_is_triaged_on_its_first_characters_and_says_so():
+    fz = FakeZendesk()
+    fz.seed(1)
+    main.copilot.systems["zendesk"] = fz.make()
+    hook = {**HOOK, "description": "I was charged twice, refund please. " + "blah " * 20_000}
+    r = TestClient(main.app).post("/webhooks/zendesk", json=hook)
+    assert r.status_code == 201
+    stored = main.copilot.get_ticket(r.json()["id"])
+    assert len(stored["body"]) == 10_000 and stored["suggestion"]["triage"]["category"] == "billing"
+    assert "only its first 10,000 characters were used" in fz.internal(1)[0]
+
+
+@pytest.mark.parametrize("subject,description,stored_subject,stored_body", [
+    ("Hi", "ok", "Hi.", "ok."),                                  # shorter than the 3 characters a typed ticket needs
+    ("", "My invoice is wrong", "(no subject)", "My invoice is wrong"),
+    ("Invoice question", "", "Invoice question", "Invoice question"),   # an empty body is filled in from the subject
+    ("  Spaced \n out  ", "Body  text", "Spaced out", "Body  text"),
+])
+def test_tiny_or_empty_fields_from_a_helpdesk_are_filled_in_not_refused(subject, description, stored_subject,
+                                                                       stored_body):
+    r = TestClient(main.app).post("/webhooks/zendesk", json={"ticket_id": "5", "subject": subject,
+                                                             "description": description})
+    assert r.status_code == 201, r.text
+    stored = main.copilot.get_ticket(r.json()["id"])
+    assert (stored["subject"], stored["body"]) == (stored_subject, stored_body)
+
+
+def test_a_ticket_typed_into_the_api_is_still_validated():
+    c = TestClient(main.app)
+    assert c.post("/tickets", json={"subject": "Hi", "body": "ok", "customer": "x"}).status_code == 422
+    assert c.post("/tickets", json={"subject": "Hello", "body": "x" * 10_001, "customer": "x"}).status_code == 422
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\n\t "])
+def test_an_empty_edited_reply_is_refused_instead_of_sending_a_blank_or_the_ai_draft(blank):
+    c = TestClient(main.app)
+    tid = c.post("/tickets", json={"subject": "Invoice", "body": "my invoice is wrong", "customer": "A"}).json()["id"]
+    r = c.post(f"/tickets/{tid}/review", json={"action": "approved", "reviewer": "ana", "edited_reply": blank})
+    assert r.status_code == 422
+    assert c.get(f"/tickets/{tid}").json()["status"] == "pending_review"          # nothing was decided
+    draft = c.post(f"/tickets/{tid}/review", json={"action": "approved", "reviewer": "ana"})  # no edit: the draft
+    assert draft.status_code == 200
+
+
+def test_the_page_will_not_approve_an_empty_reply_and_does_not_send_one_on_reject():
+    from pathlib import Path
+    page = (Path(__file__).resolve().parent.parent / "support_copilot" / "static" / "index.html").read_text()
+    assert "The reply is empty. Write one, or reject the ticket." in page
+    assert "reply.value !== s.draft_reply && reply.value.trim()" in page

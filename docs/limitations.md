@@ -9,6 +9,7 @@ What is not verified, what is a baseline, and what comes next. Back to the [READ
 - Retrieval is TF-IDF over six sample articles, with plural folding and a cutoff relative to the best match. It is lexical: it does not understand synonyms (unless an article lists them under `Keywords:`), so a differently worded question can miss the right article, and a ticket that is mostly emotion can match two weak articles. Embeddings (for example pgvector) are the next step.
 - The rule-based sentiment and language detection is a small word list, not a model: it misses sarcasm and subtle anger, and short or mixed-language text is often `und`. Treat it as a baseline.
 - Rule-based classification is a baseline, not a production classifier.
+- Zammad: an approved reply is created as a non-internal `note` article, which the customer can see in the web portal. Zammad only emails the customer for an `email` article with a `to` address, and the adapter does not set those (the customer's address is not stored yet), so the customer may not get an email. Zendesk's public comment does notify the requester. Not verified against a live Zammad.
 - No automatic retry for failed ticket-system calls; no check on webhook timestamp age.
 - A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.
 - A single SQLite connection behind a lock: fine for one instance, not for several. Use PostgreSQL to scale out.

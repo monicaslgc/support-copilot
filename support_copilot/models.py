@@ -92,6 +92,14 @@ class Review(BaseModel):
     reasons: list[Reason] = Field(default_factory=list, max_length=len(Reason))
     note: str | None = Field(default=None, max_length=500)
 
+    @field_validator("edited_reply")
+    @classmethod
+    def _not_blank(cls, v: str | None) -> str | None:
+        """An empty reply is never what a person meant to send: it would otherwise fall back to the AI's draft."""
+        if v is not None and not v.strip():
+            raise ValueError("the reply is empty: leave edited_reply out to send the draft")
+        return v
+
     @field_validator("reasons")
     @classmethod
     def _no_repeats(cls, v: list[Reason]) -> list[Reason]:

@@ -92,3 +92,30 @@ def test_validation_and_404():
     assert c.post("/tickets", json={"subject": "x", "body": "y"}).status_code == 422
     assert c.get("/tickets/9999").status_code == 404
     assert c.post("/tickets/9999/review", json={"action": "approved", "reviewer": "x"}).status_code == 404
+
+
+# ---------------- "down" and "security" are everyday words: only an outage or a breach is P1
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("subject,body", [
+    ("How do I scroll down the page?", "how do I scroll down to the totals?"),
+    ("Update security questions", "How do I change my security questions in settings?"),
+    ("Slow down", "Can you slow down the export, it is freezing"),
+    ("Countdown timer", "The countdown timer shows the wrong date"),
+])
+def test_everyday_uses_of_down_and_security_are_not_an_outage(subject, body):
+    assert classify_rules(subject, body).priority is not Priority.P1
+
+
+@pytest.mark.parametrize("subject,body", [
+    ("Platform is down", "nobody can log in"),
+    ("Dashboard down", "The dashboard has been down since 9am"),
+    ("Is it down?", "Is it down for everyone or only me?"),
+    ("Everything is down", "everything is down for everyone"),
+    ("Our site is totally down", "customers cannot order"),
+    ("Security breach", "We found a security breach in our account"),
+    ("Hacked", "I think my account was hacked"),
+])
+def test_real_outages_and_breaches_are_still_p1(subject, body):
+    assert classify_rules(subject, body).priority is Priority.P1

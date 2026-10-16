@@ -150,6 +150,7 @@ dialog { border: 1px solid var(--line); border-radius: 4px; background: var(--pa
 // Ticket text comes from customers: it is only ever inserted with textContent, never as HTML.
 const $ = (id) => document.getElementById(id);
 const CATS = ["bug", "billing", "access", "how_to", "feature_request", "other"];
+const QUEUE_LIMIT = 500; // the most the API returns; the list says so when it is full instead of hiding the rest
 const PRIOS = ["P1", "P2", "P3", "P4"];
 let tickets = [], clusters = [], clusterFilter = null, selected = null;
 
@@ -213,13 +214,14 @@ function renderClusters() {
 }
 
 async function loadList() {
-  const [all, cl] = await Promise.all([api(`/tickets?status=${$("filter").value}`), api("/clusters")]);
+  const [all, cl] = await Promise.all([api(`/tickets?status=${$("filter").value}&limit=${QUEUE_LIMIT}`), api("/clusters")]);
   clusters = cl;
   if (clusterFilter && !clusters.some((c) => c.id === clusterFilter)) clusterFilter = null;
   tickets = clusterFilter ? all.filter((t) => t.cluster && t.cluster.id === clusterFilter) : all;
   renderClusters();
   const ul = $("list");
   ul.replaceChildren();
+  if (all.length >= QUEUE_LIMIT) ul.append(el("li", { class: "empty", text: `Showing the ${QUEUE_LIMIT} most urgent tickets. Review some to see the rest.` }));
   if (!tickets.length) {
     const f = $("filter").value;
     ul.append(el("li", { class: "empty", text: clusterFilter ? "No pending tickets in this incident."
@@ -369,6 +371,7 @@ function render() {
       const name = reviewer.value.trim();
       if (!name) { say("Enter your name first.", "err"); reviewer.focus(); return; }
       try { localStorage.setItem("reviewer", name); } catch { /* optional convenience */ }
+      if (action === "approved" && !reply.value.trim()) { say("The reply is empty. Write one, or reject the ticket.", "err"); reply.focus(); return; }
       if (action === "approved" && flags.some((f) => f.severity === "hard") && !armed) {
         armed = true;
         $("approve").textContent = "Send anyway";
@@ -376,7 +379,7 @@ function render() {
         return;
       }
       const body = { action, reviewer: name };
-      if (reply.value !== s.draft_reply) body.edited_reply = reply.value;
+      if (reply.value !== s.draft_reply && reply.value.trim()) body.edited_reply = reply.value;
       if (prio.value !== tr.priority) body.final_priority = prio.value;
       if (cat.value !== tr.category) body.final_category = cat.value;
       const reasons = boxes.filter((b) => b.checked).map((b) => b.value);

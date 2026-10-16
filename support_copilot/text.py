@@ -44,7 +44,10 @@ _WEAK = (
 def rule_sentiment(text: str) -> str:
     """"negative" when the customer clearly sounds upset, else "neutral"."""
     low = text.lower()
-    score = 2 * len(re.findall(rf"\b(?:{_STRONG})\b", low)) + len(re.findall(rf"\b(?:{_WEAK})\b", low))
+    # a weak word counts once however often it is repeated: "Cancel" in the subject and "cancel" in the body
+    # is one signal, not two
+    weak = {m.group(0) for m in re.finditer(rf"\b(?:{_WEAK})\b", low)}
+    score = 2 * len(re.findall(rf"\b(?:{_STRONG})\b", low)) + len(weak)
     letters = [c for c in text if c.isalpha()]
     if "!!" in text:
         score += 1

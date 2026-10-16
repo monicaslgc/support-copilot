@@ -95,3 +95,8 @@ def test_keyboard_and_responsive_basics():
     assert ":focus-visible" in PAGE and 'class="skip"' in PAGE and 'lang="en"' in PAGE
     assert "prefers-color-scheme: dark" in PAGE and "max-width: 760px" in PAGE and 'name="viewport"' in PAGE
     assert "min-height: 40px" in PAGE   # touch targets for the decision buttons
+
+
+def test_a_full_queue_says_so_instead_of_hiding_the_rest():
+    assert "const QUEUE_LIMIT = 500" in PAGE and "&limit=${QUEUE_LIMIT}" in PAGE
+    assert "Showing the ${QUEUE_LIMIT} most urgent tickets" in PAGE

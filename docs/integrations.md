@@ -43,7 +43,7 @@ A decision sends a reply to a customer, so for a connected system it is **only a
 
 Who may do this is whoever can edit the ticket in your helpdesk, since that is who can add a tag. To narrow it, pass `Copilot(allowed_reviewers={"ana@acme.com", ...})`; anyone else's tag is ignored and logged. To switch the feature off, use `Taxonomy(helpdesk_decisions=False)`. The tag names, and every other tag and label written, can be changed ([how](embedding.md#your-tags-names-and-who-may-decide)).
 
-Setup, besides the "ticket created" webhook below: a second trigger for **tags changed** (when the ticket has `ai_approve` or `ai_reject`) that calls the same endpoint, with a payload that includes the ticket's tags and the person who made the change. Zendesk: add `"tags":"{{ticket.tags}}","agent":"{{current_user.email}}"` to the webhook body. Zammad: the adapter reads `ticket.tags` and `ticket.updated_by` (an object with `email` or `login`); check that your version's webhook payload, or its custom payload option, includes them. These payload shapes are checked against fakes only.
+Setup, besides the "ticket created" webhook below: a second trigger for **tags changed** (when the ticket has `ai_approve` or `ai_reject`) that calls the same endpoint, with a payload that includes the ticket's tags and the person who made the change. Zendesk: add `"tags":"{{ticket.tags}}","agent":"{{current_user.email}}"` to the webhook body. Zammad: the adapter reads `ticket.tags` and `ticket.updated_by` (an object with `email` or `login`). Zammad's documentation shows `updated_by` in the default ticket payload; whether the default payload carries the ticket's tags is not confirmed, so check your version's payload, or use the custom payload option, before relying on it. These payload shapes are checked against fakes only.
 
 ## Connecting Zammad
 Zammad is open source and self-hostable (see [zammad-docker-compose](https://github.com/zammad/zammad-docker-compose)).
@@ -51,7 +51,7 @@ Zammad is open source and self-hostable (see [zammad-docker-compose](https://git
 2. Admin > Webhook: endpoint `https://<your-host>/webhooks/zammad`, optionally an HMAC SHA1 signature token matching `ZAMMAD_WEBHOOK_SECRET`. The adapter reads Zammad's default payload (`{"ticket": {...}, "article": {...}}`).
 3. Admin > Trigger: "ticket created" -> notify webhook. Use *created* for new tickets; for decisions add the tag trigger described above. Updates that carry no decision tag (including those caused by the adapter's own notes) are ignored.
 
-The Zammad payload and API calls are based on its documentation and should be verified against your instance and version before relying on them.
+The Zammad payload and API calls are based on its documentation and should be verified against your instance and version before relying on them. In particular, an approved reply is posted as a non-internal `note`; whether your customer is also emailed depends on the article type (see [limitations](limitations.md)).
 
 ## Connecting Zendesk
 1. Webhook body: `{"ticket_id":"{{ticket.id}}","subject":"{{ticket.title}}","description":"{{ticket.description}}","requester":"{{ticket.requester.name}}"}`, endpoint `https://<your-host>/webhooks/zendesk`, signing secret as `ZENDESK_WEBHOOK_SECRET`.

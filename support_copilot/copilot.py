@@ -29,6 +29,7 @@ from .ticketsystems import TicketSystem, WebhookError, build_systems
 
 SIMILARITY_SCAN = 200  # how many of the latest tickets are compared by text; the other rules use indexes
 MAX_WEBHOOK_BYTES = 1_000_000
+MAX_BODY_CHARS = 10_000  # what a ticket body may hold (models.TicketIn)
 
 
 class CopilotError(Exception):
@@ -358,7 +359,7 @@ class Copilot:
             raise CopilotError(401, "invalid webhook signature")
         try:
             inbound = system.parse_webhook(raw)
-            t = TicketIn(subject=inbound.subject, body=inbound.body, customer=inbound.requester)
+            t, truncated = self._ticket_from_helpdesk(inbound)
         except WebhookError as e:
             raise CopilotError(422, str(e)) from e
         except ValidationError as e:
@@ -372,6 +373,8 @@ class Copilot:
         if row := existing():
             return self._decide_from_helpdesk(system, row["id"], inbound)
         s = self.suggest(t)
+        if truncated:
+            s.notices.append(f"The ticket is long: only its first {MAX_BODY_CHARS:,} characters were used.")
         tid = self.store(t, s, system.name, inbound.external_id)
         if tid is None:  # an identical webhook finished first while we were triaging
             return {"id": existing()["id"], "duplicate": True}
@@ -381,6 +384,22 @@ class Copilot:
                   self._internal_note(s, ctx), priority=s.triage.priority, category=s.triage.category,
                   tags=self._tags(s.triage, ctx))
         return {"id": tid, "status": Status.PENDING_REVIEW, "suggestion": s}
+
+    @staticmethod
+    def _ticket_from_helpdesk(inbound) -> tuple[TicketIn, bool]:
+        """What a helpdesk sends is not ours to reject: a long email, a one-word subject or an empty body must still
+        be triaged (a refused webhook is retried and the ticket is never seen). The API's limits are for people
+        typing a ticket; here the text is cut to fit, or filled in from the other field."""
+        subject = " ".join(inbound.subject.split())[:200] or "(no subject)"
+        body = inbound.body.strip() or subject
+        truncated = len(body) > MAX_BODY_CHARS
+
+
+        def long_enough(text: str) -> str:  # TicketIn wants 3 characters: "ok" becomes "ok."
+            return text if len(text) >= 3 else text.ljust(3, ".")
+
+        return (TicketIn(subject=long_enough(subject), body=long_enough(body[:MAX_BODY_CHARS]),
+                         customer=inbound.requester), truncated)
 
     def _decide_from_helpdesk(self, system: TicketSystem, tid: int, inbound) -> dict:
         """A ticket we already triaged was updated. If a person tagged it to approve or reject, that is their

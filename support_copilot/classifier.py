@@ -21,9 +21,15 @@ TEAMS = {
     Category.OTHER: "support-tier1",
 }
 
+# "down" and "security" alone are everyday words ("scroll down", "security questions"): an outage needs a verb or
+# a subject next to it, and a security problem needs to be one.
+_DOWN = (r"(?:(?:is|are|was|were|went|goes|has\s+been|have\s+been|been)\s+(?:it\s+|they\s+|you\s+)?"
+         r"|(?:everything|platform|site|service|system|app|server|website|dashboard|api)\s+)"
+         r"(?:completely\s+|totally\s+)?down")
 P1_WORDS = (
-    r"\b(down|outage|data loss|lost data|breach|security|hacked|nothing works|"
-    r"cannot access anything|parou|em baixo|fuga de dados)\b"
+    r"\b(outage|data loss|lost data|breach|hacked|nothing works|cannot access anything|parou|em baixo|fuga de dados|"
+    r"security\s+(?:breach|incident|issue|vulnerability|alert)|" + _DOWN + r")\b"
+    r"|\bdown\s+(?:since|for\s+(?:everyone|all|us|hours)|again|completely|right\s+now)\b"
 )
 P2_WORDS = r"\b(error|erro|fails?|failed|crash|broken|não funciona|nao funciona|urgent|urgente|blocked|bloqueado)\b"
 RULES = [

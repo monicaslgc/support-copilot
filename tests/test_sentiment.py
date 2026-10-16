@@ -266,3 +266,11 @@ def test_portuguese_tickets_are_classified_and_matched(subject, body, category, 
 def test_the_portuguese_outage_is_p1():
     t = classify_rules("A plataforma está em baixo", "Ninguém consegue aceder, está indisponível.")
     assert t.priority is Priority.P1
+
+
+def test_a_repeated_weak_word_is_one_signal_not_two():
+    # "cancel" in the subject and again in the body is a neutral question, not an upset customer
+    assert rule_sentiment("Cancel subscription\nHow do I cancel my subscription?") == "neutral"
+    assert rule_sentiment("Cancel\nWhere can I cancel? cancel cancel") == "neutral"
+    # two different weak signals still add up
+    assert rule_sentiment("I want to cancel, this is the third time") == "negative"
