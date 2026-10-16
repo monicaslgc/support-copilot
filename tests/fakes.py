@@ -31,6 +31,10 @@ class FakeSystem:
     def tags(self, tid):
         return self.tickets[int(tid)]["tags"]
 
+    def agent_adds_tag(self, tid, *tags):
+        """What an agent does in the helpdesk: the ticket changes, no webhook is sent by itself."""
+        self.tickets[int(tid)]["tags"] |= set(tags)
+
     def priority(self, tid):
         return self.tickets[int(tid)]["priority"]
 
@@ -42,8 +46,13 @@ class FakeZendesk(FakeSystem):
     def make(self):
         return ZendeskSystem("acme", "a@acme.com", "tok", transport=self.transport())
 
-    def payload(self, tid, subject, desc, who):
-        return {"ticket_id": str(tid), "subject": subject, "description": desc, "requester": who}
+    def payload(self, tid, subject, desc, who, agent=None, with_tags=False):
+        """The webhook body. `with_tags` is a ticket update: it carries the ticket's tags as they are now, in the
+        form a Zendesk webhook template renders them (one space separated string)."""
+        body = {"ticket_id": str(tid), "subject": subject, "description": desc, "requester": who}
+        if with_tags:
+            body.update(tags=" ".join(sorted(self.tickets[int(tid)]["tags"])), agent=agent)
+        return body
 
     def handler(self, req: httpx.Request):
         self.requests.append(req)
@@ -72,9 +81,11 @@ class FakeZammad(FakeSystem):
     def make(self):
         return ZammadSystem("https://help.example.com", "tok", transport=self.transport())
 
-    def payload(self, tid, subject, desc, who):
-        return {"ticket": {"id": int(tid), "title": subject, "customer": who},
-                "article": {"body": desc, "from": who}}
+    def payload(self, tid, subject, desc, who, agent=None, with_tags=False):
+        ticket = {"id": int(tid), "title": subject, "customer": who}
+        if with_tags:
+            ticket.update(tags=sorted(self.tickets[int(tid)]["tags"]), updated_by={"email": agent})
+        return {"ticket": ticket, "article": {"body": desc, "from": who}}
 
     def priority(self, tid):
         pid = self.tickets[int(tid)]["priority"]

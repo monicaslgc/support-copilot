@@ -3,6 +3,7 @@
 The core (triage, review queue, metrics) only talks to `TicketSystem`; adding a new
 system means writing one adapter with these methods, nothing else changes.
 """
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -18,6 +19,16 @@ class InboundTicket:
     subject: str
     body: str
     requester: str = "unknown"
+    tags: tuple[str, ...] = ()  # the ticket's tags at the time of the webhook (how a person decides from the helpdesk)
+    actor: str | None = None  # who triggered the webhook (an agent's email or name), when the payload says
+
+
+def split_tags(value) -> tuple[str, ...]:
+    """Tags as a list, or as the space/comma separated string a helpdesk's webhook template renders."""
+    if not value:
+        return ()
+    items = re.split(r"[\s,]+", value) if isinstance(value, str) else [str(v) for v in value]
+    return tuple(t.strip().lower() for t in items if t and t.strip())
 
 
 class WebhookError(ValueError):
@@ -65,7 +76,7 @@ class TicketSystem(ABC):
         """The human-approved reply, visible to the customer."""
 
     @abstractmethod
-    def post_rejection(self, external_id: str, reviewer: str) -> dict:
+    def post_rejection(self, external_id: str, reviewer: str, *, tag: str = "ai_rejected") -> dict:
         """Internal note only: the AI suggestion was rejected."""
 
     # --- shared executor ---

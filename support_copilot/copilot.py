@@ -20,6 +20,7 @@ from pydantic import ValidationError
 from . import clusters, feedback, guardrails, llm
 from . import db as database
 from .classifier import classify
+from .config import Taxonomy
 from .drafting import draft
 from .kb import KnowledgeBase, tokens
 from .llm import log
@@ -45,6 +46,9 @@ class Copilot:
     kb       a folder of markdown help articles, or a KnowledgeBase; default is a small bundled sample
     systems  ticket-system adapters by name; default is Zendesk and Zammad configured from the environment
     api_key  required as `X-API-Key` by the HTTP router; default is the API_KEY environment variable
+    taxonomy the tags and names written to your helpdesk, and the tags that approve or reject from inside it
+    allowed_reviewers  emails or names who may approve or reject by tag in the helpdesk; default is anyone the
+                       helpdesk lets edit the ticket. Compared without regard to case.
 
     Thread-safe: one SQLite connection is shared and every access takes `lock`, which is never held across
     a network or model call. Read `copilot.conn` and `copilot.systems` as attributes at call time.
@@ -52,12 +56,15 @@ class Copilot:
 
     def __init__(self, db: str | os.PathLike | sqlite3.Connection | None = ":memory:",
                  kb: str | os.PathLike | KnowledgeBase | None = None,
-                 systems: dict[str, TicketSystem] | None = None, api_key: str | None = None):
+                 systems: dict[str, TicketSystem] | None = None, api_key: str | None = None,
+                 taxonomy: Taxonomy | None = None, allowed_reviewers: set[str] | frozenset[str] | None = None):
         self.conn = (database.init(db) if isinstance(db, sqlite3.Connection)
                      else database.connect(None if db is None else str(db)))
         self.kb = kb if isinstance(kb, KnowledgeBase) else KnowledgeBase(Path(kb)) if kb else KnowledgeBase()
         self.systems = systems if systems is not None else build_systems()
         self.api_key = api_key
+        self.taxonomy = taxonomy or Taxonomy()
+        self.allowed_reviewers = {r.strip().lower() for r in allowed_reviewers} if allowed_reviewers else None
         self.lock = threading.RLock()
 
     # -- access ------------------------------------------------------------------------------------------
@@ -288,16 +295,19 @@ class Copilot:
         return {"cluster": cluster, "duplicate_of": duplicate,
                 "history": self.customer_history(row["customer"], tid) if row else {"count": 0, "recent": []}}
 
-    @staticmethod
-    def _context_tags(ctx: dict, triage: Triage) -> list[str]:
-        return ((["ai_possible_duplicate"] if ctx["duplicate_of"] else [])
-                + (["ai_spike"] if ctx["cluster"] and ctx["cluster"]["kind"] == "spike" else [])
-                + (["ai_sentiment_negative"] if triage.sentiment is Sentiment.NEGATIVE else [])
-                + ([f"ai_lang_{triage.language}"] if triage.language != "und" else []))
+    def _tags(self, triage: Triage, ctx: dict) -> list[str]:
+        """The tags written to the helpdesk: yours to route, filter and report on."""
+        t = self.taxonomy.tag
+        return [t("triaged"), t(f"cat_{self.taxonomy.category(triage.category.value)}"),
+                t(f"team_{self.taxonomy.team(triage.team)}"),
+                *([t("possible_duplicate")] if ctx["duplicate_of"] else []),
+                *([t("spike")] if ctx["cluster"] and ctx["cluster"]["kind"] == "spike" else []),
+                *([t("sentiment_negative")] if triage.sentiment is Sentiment.NEGATIVE else []),
+                *([t(f"lang_{triage.language}")] if triage.language != "und" else [])]
 
-    @staticmethod
-    def _internal_note(s: Suggestion, ctx: dict | None = None) -> str:
+    def _internal_note(self, s: Suggestion, ctx: dict | None = None) -> str:
         tr = s.triage
+        tx = self.taxonomy
         arts = ", ".join(a["title"] for a in s.articles) or "none"
         lines = []
         if ctx and ctx["duplicate_of"]:
@@ -317,11 +327,19 @@ class Copilot:
         related = ("\n".join(lines) + "\n") if lines else ""
         return (
             f"[AI triage - pending human review]\n"
-            f"Category: {tr.category.value} | Priority: {tr.priority.value} | Team: {tr.team} "
+            f"Category: {tx.category(tr.category.value)} | Priority: {tr.priority.value} | Team: {tx.team(tr.team)} "
             f"| Confidence: {tr.confidence} ({tr.source})\n"
             f"Sentiment: {tr.sentiment.value} | Language: {tr.language}\n"
-            f"Why: {tr.rationale}\n{related}KB articles: {arts}\n\nSuggested reply:\n{s.draft_reply}"
+            f"Why: {tr.rationale}\n{related}KB articles: {arts}\n{self._how_to_decide()}\n"
+            f"Suggested reply:\n{s.draft_reply}"
         )
+
+    def _how_to_decide(self) -> str:
+        tx = self.taxonomy
+        if not tx.helpdesk_decisions:
+            return ""
+        return (f"\nTo send the suggested reply to the customer, add the tag {tx.approve}. "
+                f"To discard it and answer yourself, add the tag {tx.reject}. Nothing is sent until then.\n")
 
     def handle_webhook(self, system_name: str, headers, raw: bytes) -> dict:
         """One inbound webhook from a ticket system: verify, triage, queue, write an internal note back.
@@ -347,7 +365,7 @@ class Copilot:
 
         # Ticket systems retry failed deliveries: make this idempotent per (system, external ticket).
         if row := existing():
-            return {"id": row["id"], "duplicate": True}
+            return self._decide_from_helpdesk(system, row["id"], inbound)
         s = self.suggest(t)
         tid = self.store(t, s, system.name, inbound.external_id)
         if tid is None:  # an identical webhook finished first while we were triaging
@@ -356,9 +374,31 @@ class Copilot:
         # Internal note only: the customer sees nothing until a human approves.
         self.push(system, inbound.external_id, "triage_note", system.post_internal_note,
                   self._internal_note(s, ctx), priority=s.triage.priority, category=s.triage.category,
-                  tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}",
-                        *self._context_tags(ctx, s.triage)])
+                  tags=self._tags(s.triage, ctx))
         return {"id": tid, "status": Status.PENDING_REVIEW, "suggestion": s}
+
+    def _decide_from_helpdesk(self, system: TicketSystem, tid: int, inbound) -> dict:
+        """A ticket we already triaged was updated. If a person tagged it to approve or reject, that is their
+        decision; any other update (including our own notes coming back as webhooks) changes nothing."""
+        already = {"id": tid, "duplicate": True}
+        decision, conflict = self.taxonomy.decision(inbound.tags)
+        if conflict:
+            log.warning("%s ticket %s has both %s and %s: acting on neither", system.name, inbound.external_id,
+                        self.taxonomy.approve, self.taxonomy.reject)
+            return {**already, "ignored": "both decision tags are set"}
+        if decision is None:
+            return already
+        actor = (inbound.actor or "").strip()
+        if self.allowed_reviewers is not None and actor.lower() not in self.allowed_reviewers:
+            log.warning("%s ticket %s: %r may not decide from the helpdesk", system.name, inbound.external_id, actor)
+            return {**already, "ignored": "reviewer is not allowed to decide from the helpdesk"}
+        try:
+            result = self.review(tid, Review(action=decision, reviewer=actor or f"{system.name} agent"))
+        except CopilotError as e:
+            if e.status == 409:  # retried delivery, or the update caused by our own reply
+                return {**already, "ignored": "already decided"}
+            raise
+        return {**result, "decided_in": system.name}
 
     # -- the human decision ------------------------------------------------------------------------------
 
@@ -397,7 +437,8 @@ class Copilot:
                 sync = self.push(system, ext, "public_reply", system.post_public_reply, final_reply,
                                  priority=Priority(final_pri), category=Category(final_cat))
             else:
-                sync = self.push(system, ext, "rejection_note", system.post_rejection, r.reviewer)
+                sync = self.push(system, ext, "rejection_note", system.post_rejection, r.reviewer,
+                                 tag=self.taxonomy.tag("rejected"))
         return {"id": ticket_id, "status": r.action, "sync": sync,
                 "warnings": guardrails.find_commitments(final_reply)}
 

@@ -123,6 +123,36 @@ def triage(r: Run) -> None:
     r.check(all(n["internal"] for n in r.written_to("zammad", ext + 1)), "a rejected ticket sends the customer nothing")
 
 
+def helpdesk(r: Run) -> None:
+    """US-12: an agent approves and rejects by tagging the ticket in the helpdesk (Zammad payloads, dry-run)."""
+    ext = 40_000_000 + r.uid
+    r.step("A billing ticket arrives from Zammad and gets an internal note")
+    t = r.webhook("zammad", ext, "Duplicate charge on invoice", "I was charged twice, refund please.", r.who("Sam"))
+    r.check(t["status"] == "pending_review", "it waits for a person; the customer has seen nothing")
+    notes = r.written_to("zammad", ext)
+    r.check(any("add the tag ai_approve" in n["body"] for n in notes), "the note says which tag sends the reply")
+
+    def tagged(tid: int, title: str, body: str, *tags: str):
+        payload = {"ticket": {"id": tid, "title": title, "customer": "Sam", "tags": list(tags),
+                              "updated_by": {"email": "ana@example.com"}}, "article": {"body": body, "from": "Sam"}}
+        return r.c.post("/webhooks/zammad", json=payload).json()
+
+    r.step("The agent adds the tag ai_approve in Zammad; Zammad calls the webhook")
+    done = tagged(ext, "Duplicate charge on invoice", "I was charged twice, refund please.", "ai_triaged", "ai_approve")
+    public = [n for n in r.written_to("zammad", ext) if not n["internal"]]
+    r.check(done.get("decided_in") == "zammad" and len(public) == 1, "the drafted reply was sent to the customer")
+    r.check(r.get(f"/tickets/{t['id']}")["review"]["reviewer"] == "ana@example.com", "and the decision is hers")
+
+    r.step("Zammad sends the same update again")
+    tagged(ext, "Duplicate charge on invoice", "I was charged twice, refund please.", "ai_triaged", "ai_approve")
+    r.check(len([n for n in r.written_to("zammad", ext) if not n["internal"]]) == 1, "nothing more is sent")
+
+    r.step("A second ticket is tagged ai_reject")
+    r.webhook("zammad", ext + 1, "Duplicate charge on invoice", "Charged twice, refund please", r.who("Rui"))
+    tagged(ext + 1, "Duplicate charge on invoice", "Charged twice, refund please", "ai_reject")
+    r.check(all(n["internal"] for n in r.written_to("zammad", ext + 1)), "a rejected ticket sends the customer nothing")
+
+
 def outage(r: Run) -> None:
     """US-03: several customers report the same outage; one click answers them all."""
     reports = [
@@ -247,6 +277,7 @@ def feedback(r: Run) -> None:
 
 SCENARIOS = {
     "triage": (triage, "US-01, US-02, US-11"),
+    "helpdesk": (helpdesk, "US-12"),
     "outage": (outage, "US-03"),
     "upset": (upset, "US-04, US-06"),
     "promise": (promise, "US-05"),

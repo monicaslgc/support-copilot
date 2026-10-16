@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from pydantic import BaseModel, ValidationError
 
 from ..models import Category, Priority
-from .base import InboundTicket, TicketSystem, WebhookError
+from .base import InboundTicket, TicketSystem, WebhookError, split_tags
 
 PRIORITY_MAP = {Priority.P1: "urgent", Priority.P2: "high", Priority.P3: "normal", Priority.P4: "low"}
 TYPE_MAP = {  # Zendesk types: problem | incident | question | task
@@ -28,6 +28,8 @@ class _Payload(BaseModel):
     subject: str
     description: str
     requester: str = "unknown"
+    tags: list[str] | str | None = None  # template: "{{ticket.tags}}" (renders as a space separated string)
+    agent: str | None = None  # template: "{{current_user.email}}"
 
 
 class ZendeskSystem(TicketSystem):
@@ -65,7 +67,8 @@ class ZendeskSystem(TicketSystem):
             p = _Payload.model_validate_json(raw)
         except ValidationError as e:
             raise WebhookError(str(e)) from e
-        return InboundTicket(str(p.ticket_id), p.subject, p.description, p.requester)
+        return InboundTicket(str(p.ticket_id), p.subject, p.description, p.requester, split_tags(p.tags),
+                             p.agent or None)
 
     def _update(self, ext_id, *, comment, public, priority=None, category=None, status=None, tags=None):
         ticket: dict = {"comment": {"body": comment, "public": public}}
@@ -88,6 +91,6 @@ class ZendeskSystem(TicketSystem):
         return self._update(external_id, comment=reply, public=True, priority=priority,
                             category=category, status="pending")
 
-    def post_rejection(self, external_id, reviewer):
-        return self._update(external_id, public=False, tags=["ai_rejected"],
+    def post_rejection(self, external_id, reviewer, *, tag="ai_rejected"):
+        return self._update(external_id, public=False, tags=[tag],
                             comment=f"[AI triage] Suggestion rejected by {reviewer}. Handle manually.")

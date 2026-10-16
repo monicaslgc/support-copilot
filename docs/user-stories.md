@@ -2,7 +2,7 @@
 
 Who uses this and what they need. Every story has acceptance criteria, an automated test that checks them (`tests/test_user_stories.py`, one test per story), and, where it makes sense, a scenario you can watch run. Back to the [README](../README.md).
 
-There are four kinds of people:
+There are four kinds of people (the agent can decide in the review page or, with the add-on setup, in the helpdesk itself):
 
 - **The agent** reviews what the AI prepared and decides what the customer receives.
 - **The support lead** decides where the AI can be trusted with more.
@@ -18,6 +18,7 @@ To watch the scenarios, start the server (`uvicorn support_copilot.main:app`) an
 | [US-03](#us-03--during-an-outage-answer-everyone-at-once) | During an outage, answer everyone at once | `outage` |
 | [US-04](#us-04--see-who-is-upset-and-who-has-written-before) | See who is upset and who wrote before | `upset` |
 | [US-05](#us-05--be-warned-before-a-reply-promises-something) | Be warned before a reply promises something | `promise` |
+| [US-12](#us-12--decide-without-leaving-my-helpdesk) | Decide without leaving my helpdesk | `helpdesk` |
 | [US-06](#us-06--answer-in-my-language-without-leaking-my-details) | Answered in my language, details kept private | `upset`, `privacy` |
 | [US-07](#us-07--know-where-the-ai-has-earned-more-trust) | Know where the AI has earned more trust | `feedback` |
 | [US-08](#us-08--know-why-people-correct-the-ai) | Know why people correct the AI | `feedback` |
@@ -86,6 +87,19 @@ Acceptance criteria:
 - An amount or a deadline is flagged more gently, because it may be correct.
 
 **See it:** `python scripts/demo.py promise` · **Checked by:** `tests/test_user_stories.py::test_us05_promises_are_flagged_before_they_are_sent`
+
+### US-12 — Decide without leaving my helpdesk
+
+**As** a support agent, **I want** to approve or reject the AI's reply from the ticket I am already working in, **so that** I do not switch to another tool.
+
+Acceptance criteria:
+
+- The internal note on each ticket says which tag sends the reply and which discards it, and nothing is sent until then.
+- When I add the approve tag, the drafted reply goes to the customer, once, and the decision is attributed to me.
+- When I add the reject tag, the customer receives nothing and I answer myself.
+- When the helpdesk sends the same update again, or the update our own reply causes, nothing more is sent.
+
+**See it:** `python scripts/demo.py helpdesk` · **Checked by:** `tests/test_user_stories.py::test_us12_an_agent_decides_without_leaving_the_helpdesk`
 
 ## The customer
 

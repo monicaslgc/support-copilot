@@ -86,7 +86,7 @@ def _demo_scenarios() -> dict:
 
 def test_every_user_story_has_a_test_and_every_story_test_has_a_story():
     stories = _stories()
-    assert len(stories) == 11
+    assert len(stories) == 12
     code = (ROOT / "tests" / "test_user_stories.py").read_text(encoding="utf-8")
     defined = set(re.findall(r"(?m)^def (test_us\d+\w*)\(", code))
     referenced = set(re.findall(r"test_user_stories\.py::(test_us\d+\w*)", "\n".join(stories.values())))

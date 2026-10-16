@@ -13,7 +13,7 @@ import os
 from collections.abc import Mapping
 
 from ..models import Priority
-from .base import InboundTicket, TicketSystem, WebhookError
+from .base import InboundTicket, TicketSystem, WebhookError, split_tags
 
 PRIORITY_ID = {Priority.P1: 3, Priority.P2: 3, Priority.P3: 2, Priority.P4: 1}
 
@@ -63,7 +63,10 @@ class ZammadSystem(TicketSystem):
             raise WebhookError(f"not a Zammad ticket payload: {e!r}") from e
         body = article.get("body") or ticket.get("title")
         who = article.get("from") or ticket.get("customer") or "unknown"
-        return InboundTicket(str(ext_id), str(subject), str(body), str(who))
+        by = ticket.get("updated_by")
+        actor = (by.get("email") or by.get("login")) if isinstance(by, dict) else by
+        return InboundTicket(str(ext_id), str(subject), str(body), str(who), split_tags(ticket.get("tags")),
+                             str(actor) if actor else None)
 
     @staticmethod
     def _article(ext_id, body, internal):
@@ -90,8 +93,8 @@ class ZammadSystem(TicketSystem):
         return self._execute([self._priority(external_id, priority),
                               self._article(external_id, reply, internal=False)])
 
-    def post_rejection(self, external_id, reviewer):
+    def post_rejection(self, external_id, reviewer, *, tag="ai_rejected"):
         return self._execute([
             self._article(external_id, f"[AI triage] Suggestion rejected by {reviewer}. Handle manually.",
                           internal=True),
-            self._tag(external_id, "ai_rejected")])
+            self._tag(external_id, tag)])

@@ -145,6 +145,33 @@ def test_us05_promises_are_flagged_before_they_are_sent(monkeypatch):
     assert {w["severity"] for w in soft} == {"soft"}                             # an amount or a deadline: gently
 
 
+def test_us12_an_agent_decides_without_leaving_the_helpdesk():
+    zendesk = FakeZendesk()
+    zendesk.seed(5, tags=["vip"])
+    main.copilot.systems["zendesk"] = zendesk.make()
+    c = TestClient(main.app)
+    made = c.post("/webhooks/zendesk", json=zendesk.payload(5, *BILLING, "Sam")).json()
+    note = zendesk.internal(5)[0]
+    assert "add the tag ai_approve" in note and "add the tag ai_reject" in note   # the ticket says how to decide
+    assert zendesk.public(5) == []
+
+    zendesk.agent_adds_tag(5, "ai_approve")                                        # the agent tags the ticket
+    c.post("/webhooks/zendesk", json=zendesk.payload(5, *BILLING, "Sam", "ana@acme.com", with_tags=True))
+    assert zendesk.public(5) == [made["suggestion"]["draft_reply"]]               # the drafted reply goes out
+    review = c.get(f"/tickets/{made['id']}").json()["review"]
+    assert (review["action"], review["reviewer"]) == ("approved", "ana@acme.com")  # attributed to that agent
+
+    c.post("/webhooks/zendesk", json=zendesk.payload(5, *BILLING, "Sam", "ana@acme.com", with_tags=True))
+    assert len(zendesk.public(5)) == 1                                             # a repeated update: nothing more
+
+    zendesk.seed(6)
+    other = c.post("/webhooks/zendesk", json=zendesk.payload(6, *BILLING, "Rui")).json()
+    zendesk.agent_adds_tag(6, "ai_reject")
+    c.post("/webhooks/zendesk", json=zendesk.payload(6, *BILLING, "Rui", "ana@acme.com", with_tags=True))
+    assert zendesk.public(6) == [] and "ai_rejected" in zendesk.tags(6)            # rejected: the agent answers
+    assert c.get(f"/tickets/{other['id']}").json()["status"] == "rejected"
+
+
 # ------------------------------------------------------------------------------------- the customer
 def test_us06_answered_in_my_language_with_my_details_masked(monkeypatch):
     fake = model_replies(monkeypatch, "Olá Ana, estamos a tratar da cobrança duplicada.")
