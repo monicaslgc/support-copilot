@@ -1,4 +1,4 @@
-.PHONY: help install run seed demo test lint check clean
+.PHONY: help install run doctor seed demo test lint check clean
 .DEFAULT_GOAL := help
 
 help:  ## list the commands
@@ -9,6 +9,9 @@ install:  ## install the package with its development dependencies
 
 run:  ## start the app and review page at http://127.0.0.1:8000/
 	uvicorn support_copilot.main:app --reload
+
+doctor:  ## check the configuration (add ARGS=--live to test the helpdesk credentials)
+	python -m support_copilot.doctor $(ARGS)
 
 seed:  ## load sample tickets into a running server
 	python scripts/seed_demo.py

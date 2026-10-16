@@ -14,7 +14,7 @@ from . import llm
 from .api import create_router
 from .copilot import Copilot
 
-copilot = Copilot(db=None)  # None: TRIAGE_DB, else ./triage.db
+copilot = Copilot.from_env()  # TRIAGE_DB (else ./triage.db), KB_DIR, API_KEY, the tag settings: see docs/api.md
 app = FastAPI(title="support-copilot (human-in-the-loop ticket triage)")
 copilot.log_startup_warnings()
 

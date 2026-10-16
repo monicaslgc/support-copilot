@@ -80,3 +80,4 @@ def test_every_third_party_import_of_the_core_is_a_declared_dependency():
 def test_ci_also_checks_the_built_wheel_in_a_clean_environment():
     ci = (ROOT / ".github/workflows/tests.yml").read_text()
     assert "python -m build --wheel" in ci and "library_usage.py" in ci and "3.13" in ci
+    assert "support_copilot.doctor" in ci and "support_copilot.evaluate" in ci   # the commands the guide gives

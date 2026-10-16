@@ -32,6 +32,7 @@ def tokens(text: str) -> list[str]:
 
 class KnowledgeBase:
     def __init__(self, directory: Path = KB_DIR):
+        self.directory = Path(directory)
         self.docs = []
         for path in sorted(directory.glob("*.md")):
             text = path.read_text(encoding="utf-8")

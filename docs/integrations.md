@@ -1,6 +1,6 @@
 # Ticket system integrations
 
-How tickets get in, what is written back, and how to connect Zammad or Zendesk. Back to the [README](../README.md).
+How tickets get in, what is written back, and how to connect Zammad or Zendesk. Back to the [README](../README.md). To set it up step by step, with checks, see [Run it against your environment](getting-started.md).
 
 ```
 ticket created -> webhook -> /webhooks/{system}

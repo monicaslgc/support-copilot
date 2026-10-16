@@ -41,6 +41,7 @@ class FakeSystem:
 
 class FakeZendesk(FakeSystem):
     name = "zendesk"
+    role = "agent"  # what the "who am I" probe reports
     PRIO = {"P1": "urgent", "P2": "high", "P3": "normal", "P4": "low"}
 
     def make(self):
@@ -59,6 +60,8 @@ class FakeZendesk(FakeSystem):
         expected = base64.b64encode(b"a@acme.com/token:tok").decode()
         if req.headers.get("authorization") != f"Basic {expected}":
             return httpx.Response(401)
+        if req.method == "GET" and req.url.path == "/api/v2/users/me.json":
+            return httpx.Response(200, json={"user": {"email": "a@acme.com", "role": self.role}})
         tid = int(req.url.path.split("/")[-1].removesuffix(".json"))
         if tid not in self.tickets:
             return httpx.Response(404)
@@ -95,6 +98,8 @@ class FakeZammad(FakeSystem):
         self.requests.append(req)
         if req.headers.get("authorization") != "Token token=tok":
             return httpx.Response(401)
+        if req.method == "GET" and req.url.path == "/api/v1/users/me":
+            return httpx.Response(200, json={"login": "agent", "email": "agent@example.com"})
         body, path = json.loads(req.content), req.url.path
         if path == "/api/v1/ticket_articles":
             tid = body["ticket_id"]

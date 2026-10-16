@@ -70,6 +70,14 @@ class ZendeskSystem(TicketSystem):
         return InboundTicket(str(p.ticket_id), p.subject, p.description, p.requester, split_tags(p.tags),
                              p.agent or None)
 
+    probe_path = "/api/v2/users/me.json"
+
+    def read_probe(self, response):
+        user = response.json().get("user", {})
+        if user.get("role") == "end-user":
+            return False, f"{user.get('email')} is an end user and cannot update tickets: use an agent or admin"
+        return True, f"authenticated as {user.get('email')} (role {user.get('role')})"
+
     def _update(self, ext_id, *, comment, public, priority=None, category=None, status=None, tags=None):
         ticket: dict = {"comment": {"body": comment, "public": public}}
         if priority:

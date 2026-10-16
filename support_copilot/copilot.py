@@ -20,7 +20,7 @@ from pydantic import ValidationError
 from . import clusters, feedback, guardrails, llm
 from . import db as database
 from .classifier import classify
-from .config import Taxonomy
+from .config import Taxonomy, env_flag
 from .drafting import draft
 from .kb import KnowledgeBase, tokens
 from .llm import log
@@ -30,6 +30,21 @@ from .ticketsystems import TicketSystem, WebhookError, build_systems
 SIMILARITY_SCAN = 200  # how many of the latest tickets are compared by text; the other rules use indexes
 MAX_WEBHOOK_BYTES = 1_000_000
 MAX_BODY_CHARS = 10_000  # what a ticket body may hold (models.TicketIn)
+
+
+def fit_ticket(subject: str, body: str, customer: str = "unknown") -> tuple[TicketIn, bool]:
+    """A ticket as a helpdesk or an export holds it, fitted to what `TicketIn` accepts: a long email is cut, a tiny
+    or empty field is filled in. A refused webhook is retried and the ticket is never seen, so what a helpdesk
+    sends is not ours to reject; the limits of `TicketIn` are for people typing a ticket. Returns the ticket and
+    whether the body was cut."""
+    subject = " ".join(subject.split())[:200] or "(no subject)"
+    body = body.strip() or subject
+    truncated = len(body) > MAX_BODY_CHARS
+
+    def long_enough(text: str) -> str:  # TicketIn wants 3 characters: "ok" becomes "ok."
+        return text if len(text) >= 3 else text.ljust(3, ".")
+
+    return TicketIn(subject=long_enough(subject), body=long_enough(body[:MAX_BODY_CHARS]), customer=customer), truncated
 
 
 class CopilotError(Exception):
@@ -72,6 +87,16 @@ class Copilot:
         self.allowed_reviewers = {r.strip().lower() for r in allowed_reviewers} if allowed_reviewers else None
         self.allow_unsigned_decisions = allow_unsigned_decisions
         self.lock = threading.RLock()
+
+    @classmethod
+    def from_env(cls, db=None) -> "Copilot":
+        """A Copilot configured from environment variables, as the reference server is (see docs/api.md):
+        TRIAGE_DB, KB_DIR, API_KEY, the ticket-system credentials, the tag and label settings of `Taxonomy.from_env`,
+        ALLOWED_REVIEWERS (comma separated) and ALLOW_UNSIGNED_DECISIONS."""
+        reviewers = {r.strip() for r in os.getenv("ALLOWED_REVIEWERS", "").split(",") if r.strip()}
+        return cls(db=db, kb=os.getenv("KB_DIR") or None, taxonomy=Taxonomy.from_env(),
+                   allowed_reviewers=reviewers or None,
+                   allow_unsigned_decisions=env_flag("ALLOW_UNSIGNED_DECISIONS", False))
 
     # -- access ------------------------------------------------------------------------------------------
 
@@ -387,19 +412,7 @@ class Copilot:
 
     @staticmethod
     def _ticket_from_helpdesk(inbound) -> tuple[TicketIn, bool]:
-        """What a helpdesk sends is not ours to reject: a long email, a one-word subject or an empty body must still
-        be triaged (a refused webhook is retried and the ticket is never seen). The API's limits are for people
-        typing a ticket; here the text is cut to fit, or filled in from the other field."""
-        subject = " ".join(inbound.subject.split())[:200] or "(no subject)"
-        body = inbound.body.strip() or subject
-        truncated = len(body) > MAX_BODY_CHARS
-
-
-        def long_enough(text: str) -> str:  # TicketIn wants 3 characters: "ok" becomes "ok."
-            return text if len(text) >= 3 else text.ljust(3, ".")
-
-        return (TicketIn(subject=long_enough(subject), body=long_enough(body[:MAX_BODY_CHARS]),
-                         customer=inbound.requester), truncated)
+        return fit_ticket(inbound.subject, inbound.body, inbound.requester)
 
     def _decide_from_helpdesk(self, system: TicketSystem, tid: int, inbound) -> dict:
         """A ticket we already triaged was updated. If a person tagged it to approve or reject, that is their

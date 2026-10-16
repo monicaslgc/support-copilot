@@ -31,18 +31,25 @@ Set `API_KEY` and send it as `X-API-Key` to protect everything except `/health` 
 
 ## Configuration
 
-All settings are environment variables. Nothing is required: without any of them the app runs offline with rules and a local SQLite file.
+All settings of the reference server are environment variables. (When you embed the library, the same settings are arguments of `Copilot`: see the [embedding guide](embedding.md).) Check them with `python -m support_copilot.doctor`. Nothing is required: without any of them the app runs offline with rules and a local SQLite file.
 
 | Variable | Default | What it does |
 |---|---|---|
 | `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` | not set | Turns on Claude for triage and drafts. Without it the rules and the template are used |
 | `TRIAGE_MODEL` | `claude-opus-5-5` | Model used for triage and drafts, for example `claude-haiku-5-5` for cheaper bulk triage |
 | `TRIAGE_DB` | `triage.db` | Path of the SQLite file |
+| `KB_DIR` | the bundled samples | Folder of markdown help articles (the first line of each is its title; an optional `Keywords:` line lists words customers use) |
 | `API_KEY` | not set | When set, every route except `/health`, `/` and the webhooks needs `X-API-Key` |
 | `ZAMMAD_URL`, `ZAMMAD_TOKEN` | not set | Connect the Zammad adapter (otherwise it runs in dry-run) |
 | `ZAMMAD_WEBHOOK_SECRET` | not set | Verifies the HMAC-SHA1 signature of Zammad webhooks |
 | `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` | not set | Connect the Zendesk adapter (otherwise it runs in dry-run) |
 | `ZENDESK_WEBHOOK_SECRET` | not set | Verifies the HMAC-SHA256 signature of Zendesk webhooks |
+| `TAG_PREFIX` | `ai_` | In front of every tag written to the helpdesk (`ai_triaged`, `ai_cat_...`) |
+| `APPROVE_TAG`, `REJECT_TAG` | `approve`, `reject` | The tags (after the prefix) an agent adds to send or discard the draft |
+| `HELPDESK_DECISIONS` | `1` | `0` turns off approving by tag: only the review page and the API decide |
+| `ALLOWED_REVIEWERS` | everyone who can edit the ticket | Comma separated emails who may decide by tag; anyone else's tag is ignored |
+| `ALLOW_UNSIGNED_DECISIONS` | `0` | `1` accepts a decision by tag for a connected system without its webhook secret: a trusted network only |
+| `CATEGORY_LABELS`, `TEAM_LABELS` | not set | Your names for ours, like `billing=finance-queries,bug=defects`; they appear in tags and notes |
 | `CLUSTER_WINDOW_MIN` | `60` | Minutes within which tickets can be linked as the same issue or a duplicate |
 | `SPIKE_MIN_CUSTOMERS` | `3` | Different customers needed for a possible incident |
 | `AUTOMATION_MIN_REVIEWS` | `20` | Reviews a category needs before it can be an automation candidate |

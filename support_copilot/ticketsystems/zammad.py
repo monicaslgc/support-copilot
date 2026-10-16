@@ -68,6 +68,12 @@ class ZammadSystem(TicketSystem):
         return InboundTicket(str(ext_id), str(subject), str(body), str(who), split_tags(ticket.get("tags")),
                              str(actor) if actor else None)
 
+    probe_path = "/api/v1/users/me"
+
+    def read_probe(self, response):
+        user = response.json()
+        return True, f"authenticated as {user.get('email') or user.get('login')}"
+
     @staticmethod
     def _article(ext_id, body, internal):
         return {"method": "POST", "path": "/api/v1/ticket_articles", "json": {

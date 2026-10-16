@@ -4,6 +4,7 @@ teams, and which tags a person adds to approve or reject the AI's reply from ins
 Tags are the interface on purpose: your helpdesk's own triggers and views can route on them (for example "tag
 ai_team_finance: assign to the Finance group") without support-copilot knowing your groups, ids or custom fields.
 """
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -45,6 +46,21 @@ class Taxonomy:
         for label in (*self.category_labels.values(), *self.team_labels.values()):
             _check("label", label)
 
+    @classmethod
+    def from_env(cls) -> "Taxonomy":
+        """The same settings from environment variables, for the reference server (see docs/api.md):
+        TAG_PREFIX, APPROVE_TAG, REJECT_TAG, HELPDESK_DECISIONS (0 turns it off), CATEGORY_LABELS and TEAM_LABELS
+        (like "billing=finance-queries,bug=defects")."""
+        defaults = cls()
+        return cls(
+            tag_prefix=os.getenv("TAG_PREFIX", defaults.tag_prefix),
+            category_labels=parse_pairs(os.getenv("CATEGORY_LABELS", ""), "CATEGORY_LABELS"),
+            team_labels=parse_pairs(os.getenv("TEAM_LABELS", ""), "TEAM_LABELS"),
+            approve_tag=os.getenv("APPROVE_TAG", defaults.approve_tag),
+            reject_tag=os.getenv("REJECT_TAG", defaults.reject_tag),
+            helpdesk_decisions=env_flag("HELPDESK_DECISIONS", True),
+        )
+
     def tag(self, name: str) -> str:
         return f"{self.tag_prefix}{name}"
 
@@ -71,3 +87,25 @@ class Taxonomy:
         if approve and reject:
             return None, True
         return (Decision.APPROVED if approve else Decision.REJECTED if reject else None), False
+
+
+def env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    if value.strip().lower() in ("1", "true", "yes", "on"):
+        return True
+    if value.strip().lower() in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"{name}={value!r}: use 1 or 0")
+
+
+def parse_pairs(text: str, name: str) -> dict[str, str]:
+    """"billing=finance-queries,bug=defects" as a dict. A malformed entry is an error, not silently skipped."""
+    out = {}
+    for item in filter(None, (part.strip() for part in text.split(","))):
+        key, sep, value = item.partition("=")
+        if not sep or not key.strip() or not value.strip():
+            raise ValueError(f"{name}: {item!r} is not name=label (example: billing=finance-queries)")
+        out[key.strip()] = value.strip()
+    return out

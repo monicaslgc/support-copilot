@@ -77,7 +77,7 @@ Twelve [user stories](docs/user-stories.md) (support agents, support leads, admi
 
 ## How it is validated
 
-- **410 tests** on Python 3.11, 3.12 and 3.13, with `ruff`, in CI, plus a job that builds the wheel and uses it in a clean environment. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's colour tokens, contrast ratios and approval controls.
+- **439 tests** on Python 3.11, 3.12 and 3.13, with `ruff`, in CI, plus a job that builds the wheel and uses it in a clean environment. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's colour tokens, contrast ratios and approval controls.
 - **User stories are executable:** each of the twelve stories has an acceptance test, and a test fails if a story, its test or its demo scenario drifts apart.
 - **Mutation-checked:** I broke the code on purpose in dozens of ways (a swapped public and internal note, overwritten tags, a missing idempotency check, a promise let through) and made sure a test failed each time. Several did not at first, and each of those got a new test.
 - **Driven in a real browser** (Chromium) for the approve, reject and bulk flows and a hostile ticket that must show as text. That run is manual, not part of CI.
@@ -87,7 +87,7 @@ Twelve [user stories](docs/user-stories.md) (support agents, support leads, admi
 
 | Area | State |
 |---|---|
-| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (410 tests, synthetic data) |
+| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (439 tests, synthetic data) |
 | Library API and FastAPI router (`Copilot`, `create_router`) | **Implemented and tested offline;** CI installs the built wheel in a clean environment and runs the library example |
 | Approving by tag in the helpdesk, your own tags and names | **Prototyped:** tested against stateful fakes of Zammad and Zendesk, including the webhook payloads that carry the tags and the acting agent |
 | Zammad and Zendesk adapters | **Prototyped:** tested against stateful fakes only, never a live instance |
@@ -108,6 +108,7 @@ pip install "support-copilot[fastapi] @ git+https://github.com/monicaslgc/suppor
 
 | You want | You use |
 |---|---|
+| To try it on your own tickets and connect your helpdesk | The [step-by-step guide](docs/getting-started.md): an offline run on your export, `python -m support_copilot.doctor`, then dry-run, shadow and pilot stages |
 | Triage and a draft inside your own code | `Copilot().suggest(ticket)`: nothing is stored or sent. [`examples/library_usage.py`](examples/library_usage.py) |
 | The queue and webhooks in your FastAPI app | `app.include_router(create_router(Copilot(db=..., kb=...)))`. [`examples/embed_fastapi.py`](examples/embed_fastapi.py) |
 | Your tags, names and who may approve | `Copilot(taxonomy=Taxonomy(...), allowed_reviewers={...})`. [How](docs/embedding.md#your-tags-names-and-who-may-decide) |
@@ -123,7 +124,7 @@ pip install -e ".[dev]"   # or: make install
 uvicorn support_copilot.main:app --reload          # review page at http://127.0.0.1:8000/
 python scripts/seed_demo.py            # in another terminal: loads sample tickets
 python scripts/demo.py all             # plays the user stories against the server and checks each outcome
-pytest                                 # 410 tests, offline
+pytest                                 # 439 tests, offline
 ```
 
 `scripts/demo.py list` shows the scenarios. [`examples/`](examples/README.md) has ready-made Zammad and Zendesk payloads and the `curl` commands to send them, including signed ones and the approve-by-tag update. To use Claude, set `ANTHROPIC_API_KEY` (the model is `TRIAGE_MODEL`). To connect Zammad or Zendesk, see [integrations](docs/integrations.md). Every setting is in [API and configuration](docs/api.md).
@@ -131,6 +132,7 @@ pytest                                 # 410 tests, offline
 ## Documentation
 
 - [User stories](docs/user-stories.md): who needs what, with acceptance criteria, each checked by a test
+- [Run it against your environment](docs/getting-started.md): install, configure, check, connect, verify, troubleshoot
 - [Embedding guide](docs/embedding.md): your own articles, database, API key, tags and ticket systems
 - [Examples](examples/README.md): payloads and `curl` commands for Zammad and Zendesk
 - [Features in detail](docs/features.md): the review page, Claude or rules, incidents, customer context, feedback, guardrails

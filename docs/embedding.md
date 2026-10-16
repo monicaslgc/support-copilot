@@ -1,6 +1,6 @@
 # Embedding guide
 
-How to use support-copilot inside your own ecosystem instead of running it as a separate app. Back to the [README](../README.md).
+How to use support-copilot inside your own ecosystem instead of running it as a separate app. Back to the [README](../README.md). Connecting a helpdesk? [Run it against your environment](getting-started.md) covers the stages, the checks and troubleshooting.
 
 Install from GitHub (it is not on PyPI), choosing the extras you need:
 

@@ -79,6 +79,29 @@ class TicketSystem(ABC):
     def post_rejection(self, external_id: str, reviewer: str, *, tag: str = "ai_rejected") -> dict:
         """Internal note only: the AI suggestion was rejected."""
 
+    # --- a read-only call that proves the credentials work ---
+    probe_path: str = ""  # a GET that changes nothing, e.g. "who am I"
+
+    def read_probe(self, response: httpx.Response) -> tuple[bool, str]:
+        """(ok, what to tell the person) from the answer to `probe_path`."""
+        return True, "the credentials work"
+
+    def check_connection(self) -> tuple[bool, str]:
+        """Call `probe_path` and say whether the credentials work. Used by `python -m support_copilot.doctor --live`."""
+        if not self.configured:
+            return False, "not configured: the credentials are missing"
+        try:
+            with httpx.Client(transport=self.transport, timeout=10, base_url=self.base_url,
+                              headers=self.auth_headers(), auth=self.basic_auth()) as http:
+                r = http.get(self.probe_path)
+        except httpx.HTTPError as e:
+            return False, f"could not reach {self.base_url}: {type(e).__name__}: {e}"
+        if r.status_code in (401, 403):
+            return False, f"{r.status_code}: the credentials were refused"
+        if r.status_code >= 400:
+            return False, f"{r.status_code} from {self.probe_path}"
+        return self.read_probe(r)
+
     # --- shared executor ---
     def _execute(self, requests: list[dict]) -> dict:
         """Send requests in order, or return them untouched in dry-run (no credentials)."""

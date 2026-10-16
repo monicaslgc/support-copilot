@@ -37,3 +37,6 @@ jobs:
           /tmp/clean/bin/python -I -c "from support_copilot.main import app; print('server imports')"
           cp "$GITHUB_WORKSPACE/examples/library_usage.py" .
           /tmp/clean/bin/python library_usage.py | tail -1
+          /tmp/clean/bin/python -m support_copilot.doctor | tail -2
+          echo '[{"subject":"Invoice wrong","body":"I was charged twice, please refund"}]' > tickets.json
+          /tmp/clean/bin/python -m support_copilot.evaluate tickets.json --preview 0 | head -1

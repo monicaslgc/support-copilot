@@ -117,3 +117,31 @@ def test_the_scenarios_the_stories_point_to_exist_and_cover_them():
     covered = {story for _, stories in scenarios.values() for story in re.findall(r"US-\d+", stories)}
     for story in covered:
         assert "python scripts/demo.py" in _stories()[story], f"{story} has a scenario the document does not show"
+
+
+def test_every_environment_variable_the_code_reads_is_documented():
+    names = set()
+    for path in (ROOT / "support_copilot").rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        names |= set(re.findall(r'(?:getenv|env_flag|environ\.get)\(\s*"([A-Z][A-Z0-9_]+)"', text))
+        names |= set(re.findall(r'secret_env = "([A-Z0-9_]+)"', text))
+    api = (ROOT / "docs" / "api.md").read_text(encoding="utf-8")
+    undocumented = sorted(n for n in names if f"`{n}`" not in api)
+    assert names and not undocumented, f"read by the code but not in docs/api.md: {undocumented}"
+
+
+def test_the_messages_the_troubleshooting_table_quotes_are_the_ones_the_code_sends():
+    guide = (ROOT / "docs" / "getting-started.md").read_text(encoding="utf-8")
+    code = (ROOT / "support_copilot" / "copilot.py").read_text(encoding="utf-8")
+    for message in re.findall(r'"ignored": "([^"]+?)(?: \.\.\.|")', guide):
+        stem = message.split("...")[0].rstrip(" .")
+        assert stem in code, f"the guide quotes {message!r} but the code never says it"
+    assert "unknown ticket system" in code and "unknown ticket system" in guide
+
+
+def test_the_commands_in_the_guide_exist():
+    guide = (ROOT / "docs" / "getting-started.md").read_text(encoding="utf-8")
+    for module in ("support_copilot.doctor", "support_copilot.evaluate"):
+        assert f"python -m {module}" in guide
+        assert importlib.util.find_spec(module) is not None
+    assert "--live" in guide and "--model" in guide and "--rules" in guide
