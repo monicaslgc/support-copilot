@@ -25,7 +25,7 @@ In the review page the three kinds of content are kept apart on purpose: the **c
 | `review-queue.png`, `after-approval.png`, `approved-view.png`, `incident-spike.png`, `customer-context.png`, `insights.png`, `mobile-dark.png` | The running app with invented demo data | `scripts/capture_screenshots.py` |
 | `guardrails.png` | The same, with a stub model so the masking notice shows without an API key; the promise is typed in by the reviewer | `scripts/capture_screenshots.py` |
 | `architecture.png` | The flow, drawn with the author's diagram kit (`docs/src/architecture.py`) | `scripts/render_assets.py` |
-| `social-preview.png` | 1280 × 640 GitHub social preview | `scripts/render_assets.py` |
+| `social-preview.png` | 1280 × 640 GitHub social preview, also the README header | `scripts/render_assets.py` |
 | `../marketing/linkedin/images/support-copilot-4x5.png` | 1080 × 1350 LinkedIn graphic, in the kit's editorial template | `scripts/render_assets.py` |
 
 ```bash
@@ -35,6 +35,20 @@ python scripts/render_assets.py
 ```
 
 Neither script is part of CI. Screenshots were rendered with Inter, JetBrains Mono and DM Serif Display.
+
+## Kit checklist
+
+What each image was checked against (from the author's LinkedIn Media Kit):
+
+| Rule | How it is met |
+|---|---|
+| Official palette, no neon, purple, intense gradients or 3D | Cream, Sage, Dark green, Charcoal and Muted green only; rust and ochre only on warnings in the app |
+| At most two families per piece | Social preview and LinkedIn graphic use DM Serif Display and Inter. The diagram and the app also use JetBrains Mono for technical labels, as the kit's diagram tool does |
+| Formats | 4:5 (1080 × 1350) for the post graphic, 16:9 for the diagram, 2:1 (1280 × 640) for the GitHub social preview |
+| One idea per image, short title, plenty of space | The graphic says one thing: AI prepares, a person decides |
+| No dashes or arrows in the text of an image | Titles and labels use full stops, commas and middle dots. The diagram's flow lines are drawn, not typed |
+| Nothing invented | Screenshots come from the running app with synthetic data; the graphic lists the README's eight capabilities; status labels say prototype, tested against fakes |
+| No robots, digital brains or circuit decoration | Line icons of real concepts only (inbox, document, shield) |
 
 ## Social preview
 

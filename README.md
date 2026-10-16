@@ -1,19 +1,14 @@
 # support-copilot
 
-[![tests](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml/badge.svg)](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml)
-![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-153D32)
-![MIT licence](https://img.shields.io/badge/licence-MIT-A0B3A0)
-![Status: concept](https://img.shields.io/badge/status-concept%20%2F%20portfolio-202A27)
+[![tests](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml/badge.svg)](https://github.com/monicaslgc/support-copilot/actions/workflows/tests.yml) ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-153D32) ![MIT licence](https://img.shields.io/badge/licence-MIT-A0B3A0) ![Status: concept](https://img.shields.io/badge/status-concept%20%2F%20portfolio-202A27)
 
-![support-copilot: AI can prepare the answer; a person decides what gets sent. The workflow runs from ticket through triage, draft and human review to the customer.](docs/project-cover.svg)
+![support-copilot: AI-assisted support, human-approved decisions. A review page with the AI's draft and a separate human decision panel.](docs/social-preview.png)
 
 **A human-in-the-loop AI copilot for support tickets.** It triages each ticket, finds the right help article, drafts the reply in the customer's language and warns when a draft promises something it shouldn't. **A person approves every message before it reaches the customer**, and the app measures where the AI has earned more trust.
 
+[Try it](#try-it) · [See it](#see-it-in-action) · [How it works](#how-it-works) · [What is verified](#what-is-verified) · [Docs](#documentation)
+
 > **Status: concept / portfolio project**, built from scratch with synthetic data. The Zammad and Zendesk adapters follow the vendors' documented APIs but have only been tested against stateful fakes, and the Claude calls only against a fake SDK. Nothing here has run against a live ticket system or the live API yet. See [what is not verified](docs/limitations.md).
-
-<p align="center"><img src="docs/review-queue.png" width="820" alt="The review page: the customer's ticket, the AI's triage and draft in a sage panel, and a separate bordered 'Your decision' panel with Approve and Reject."></p>
-
-<p align="center"><em>The review page (synthetic demo data). Ticket, AI suggestion and human decision are three visibly different things.</em></p>
 
 ## Why this exists
 
@@ -44,6 +39,9 @@ This project explores the cautious end of that question: **the AI only suggests,
 Eleven [user stories](docs/user-stories.md) (support agents, support leads, admins) spell out what each role needs. Each one is checked by a test, and most by a scenario you can watch run.
 
 ## See it in action
+
+<p align="center"><img src="docs/review-queue.png" width="760" alt="The review page: the customer's ticket, the AI's triage and draft in sage panels, and a separate bordered Your decision panel with Approve and Reject."></p>
+<p align="center"><em>The review page (synthetic demo data). Ticket, AI suggestion and human decision are three visibly different things.</em></p>
 
 | An outage becomes one incident | A promise gets a warning |
 |---|---|
@@ -78,12 +76,16 @@ Eleven [user stories](docs/user-stories.md) (support agents, support leads, admi
 - **Driven in a real browser** (Chromium) for the approve, reject and bulk flows and a hostile ticket that must show as text. That run is manual, not part of CI.
 - **Measured:** saving a ticket stays at about 6.5 ms from 100 to 2000 tickets in an hour. [Engineering notes](docs/engineering.md).
 
-## Current limitations
+## What is verified
 
-- It has not run against a real Zammad, Zendesk or the live Claude API.
-- Retrieval is lexical, and the rule-based fallbacks are baselines, not production classifiers.
-- The guardrails are rules with known gaps; the API key is one shared secret, not per-user auth.
-- One instance, one SQLite file. Fine for a few thousand tickets an hour, not more.
+| Area | State |
+|---|---|
+| Triage, drafts, review page, guardrails, feedback metrics | **Implemented and tested offline** (332 tests, synthetic data) |
+| Zammad and Zendesk adapters | **Prototyped:** tested against stateful fakes only, never a live instance |
+| Claude calls | **Prototyped:** tested against a fake SDK only, never the live API |
+| Retrieval and rule-based fallbacks | **Baselines:** lexical retrieval and keyword rules, not production classifiers |
+| Guardrails | **Rules with known gaps:** names and addresses are not masked, an oddly worded promise gets through |
+| Scale and auth | One instance, one SQLite file, one shared API key. A few thousand tickets an hour at most |
 
 Full list and next steps: [limitations](docs/limitations.md).
 
