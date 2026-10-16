@@ -4,11 +4,11 @@
 help:  ## list the commands
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-8s %s\n", $$1, $$2}'
 
-install:  ## install runtime and development dependencies
-	pip install -r requirements-dev.txt
+install:  ## install the package with its development dependencies
+	pip install -e ".[dev]"
 
 run:  ## start the app and review page at http://127.0.0.1:8000/
-	uvicorn app.main:app --reload
+	uvicorn support_copilot.main:app --reload
 
 seed:  ## load sample tickets into a running server
 	python scripts/seed_demo.py

@@ -8,7 +8,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-KB_DIR = Path(__file__).resolve().parent.parent / "data" / "kb"
+KB_DIR = Path(__file__).resolve().parent / "kb"  # a small sample; pass your own folder to KnowledgeBase
 _STOP = set(
     "a o os as de do da dos das e em um uma para por com que se na no nos nas meu minha "
     "the of to and in is it my i not you your can could would should will how what when where why "

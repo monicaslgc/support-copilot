@@ -6,10 +6,10 @@ os.environ["TRIAGE_DB"] = ":memory:"
 import pytest
 from fastapi.testclient import TestClient
 
-from app.classifier import classify_rules
-from app.kb import KnowledgeBase
-from app.main import app
-from app.models import Category, Priority
+from support_copilot.classifier import classify_rules
+from support_copilot.kb import KnowledgeBase
+from support_copilot.main import app
+from support_copilot.models import Category, Priority
 
 
 @pytest.mark.parametrize(

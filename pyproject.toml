@@ -1,3 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "support-copilot"
+version = "0.1.0"
+description = "Human-in-the-loop AI copilot for support tickets: triage, grounded draft replies, review queue and ticket-system adapters, to embed in your own stack"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Monica" }]
+dependencies = ["pydantic>=2", "httpx>=0.27"]
+
+[project.optional-dependencies]
+claude = ["anthropic>=1.14"]            # model-backed triage and drafts (rules are used without it)
+fastapi = ["fastapi>=0.110"]            # the embeddable router: support_copilot.api
+server = ["fastapi>=0.110", "uvicorn>=0.29", "anthropic>=1.14"]   # the reference server
+dev = ["pytest>=8", "httpx>=0.27", "ruff", "fastapi>=0.110", "uvicorn>=0.29", "anthropic>=1.14"]
+
+[project.urls]
+Repository = "https://github.com/monicaslgc/support-copilot"
+
+[tool.setuptools.packages.find]
+include = ["support_copilot*"]
+
+[tool.setuptools.package-data]
+support_copilot = ["kb/*.md", "static/*.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]          # so a bare `pytest` (as in CI) can import `app` and `tests`

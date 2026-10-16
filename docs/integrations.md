@@ -41,4 +41,4 @@ The Zammad payload and API calls are based on its documentation and should be ve
 2. Trigger on "ticket created" -> notify the webhook. Create an API token under Apps and integrations > APIs.
 
 ## Adding another system
-Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse_webhook`, `post_internal_note`, `post_public_reply`, `post_rejection`, plus `base_url`/auth. Register it in `build_systems()`. Add a stateful fake to `tests/fakes.py` with the same read API (`public`, `internal`, `tags`, `priority`) and add it to the `env` fixture params: the whole end-to-end suite then runs against it.
+Implement `TicketSystem` (`support_copilot/ticketsystems/base.py`): `verify_webhook`, `parse_webhook`, `post_internal_note`, `post_public_reply`, `post_rejection`, plus `base_url`/auth. Register it in `build_systems()`, or pass it to your own `Copilot(systems={...})`. Add a stateful fake to `tests/fakes.py` with the same read API (`public`, `internal`, `tags`, `priority`) and add it to the `env` fixture params: the whole end-to-end suite then runs against it.

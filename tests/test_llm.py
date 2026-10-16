@@ -9,10 +9,10 @@ import types
 
 import pytest
 
-from app import llm
-from app.classifier import classify
-from app.drafting import draft_reply
-from app.models import Category, Priority, Triage
+from support_copilot import llm
+from support_copilot.classifier import classify
+from support_copilot.drafting import draft_reply
+from support_copilot.models import Category, Priority, Triage
 
 GOOD = {"category": "billing", "priority": "P2", "confidence": 0.9, "rationale": "double charge"}
 

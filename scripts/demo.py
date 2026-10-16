@@ -208,7 +208,7 @@ def promise(r: Run) -> None:
 
 def privacy(r: Run) -> None:
     """US-06: private details are masked before text goes to a model; the ticket keeps the original."""
-    from app.guardrails import redact
+    from support_copilot.guardrails import redact
 
     text = ("Charged twice. Write to ana.silva@example.com or call +351 912 345 678. "
             "Card 4111 1111 1111 1111, order 1234 5678 9012 3456.")
@@ -263,11 +263,11 @@ def in_process_client():
     os.environ["TRIAGE_DB"] = ":memory:"
     from fastapi.testclient import TestClient
 
-    from app import main, state
-    from app.db import connect
-    from app.ticketsystems import build_systems
+    from support_copilot import main
+    from support_copilot.db import connect
+    from support_copilot.ticketsystems import build_systems
 
-    state.conn, state.systems = connect(":memory:"), build_systems()
+    main.copilot.conn, main.copilot.systems = connect(":memory:"), build_systems()
     return TestClient(main.app)
 
 

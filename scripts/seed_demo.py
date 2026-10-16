@@ -1,6 +1,6 @@
 """Load the sample tickets into a running server, as if a ticket system had sent them.
 
-    uvicorn app.main:app &
+    uvicorn support_copilot.main:app &
     python scripts/seed_demo.py                 # http://127.0.0.1:8000
     python scripts/seed_demo.py http://host:8000 --api-key SECRET
 """

@@ -8,7 +8,7 @@ import json
 
 import httpx
 
-from app.ticketsystems import ZammadSystem, ZendeskSystem
+from support_copilot.ticketsystems import ZammadSystem, ZendeskSystem
 
 
 class FakeSystem:

@@ -7,10 +7,10 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main, state
-from app.models import Category, Priority
-from app.ticketsystems import WebhookError, ZammadSystem
-from app.ticketsystems.zendesk import verify_signature as zd_verify
+from support_copilot import main
+from support_copilot.models import Category, Priority
+from support_copilot.ticketsystems import WebhookError, ZammadSystem
+from support_copilot.ticketsystems.zendesk import verify_signature as zd_verify
 from tests.fakes import FakeZammad, FakeZendesk
 
 ZD = {"ticket_id": "4711", "subject": "Duplicate charge on invoice",
@@ -27,7 +27,7 @@ def bodies(fake):
 def test_zendesk_wire_format():
     fz = FakeZendesk()
     fz.seed(4711)
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     TestClient(main.app).post("/webhooks/zendesk", json=ZD)
     req, t = fz.requests[0], bodies(fz)[0]["ticket"]
     assert req.method == "PUT" and str(req.url) == "https://acme.zendesk.com/api/v2/tickets/4711.json"
@@ -39,7 +39,7 @@ def test_zendesk_wire_format():
 def test_zendesk_public_reply_sets_status_pending_and_type():
     fz = FakeZendesk()
     fz.seed(4711)
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     tid = c.post("/webhooks/zendesk", json=ZD).json()["id"]
     c.post(f"/tickets/{tid}/review", json={"action": "approved", "reviewer": "m",
@@ -71,7 +71,7 @@ def test_zendesk_bad_payload():
 def test_zammad_wire_format_internal_note():
     fz = FakeZammad()
     fz.seed(55, tags=["vip"])
-    state.systems["zammad"] = fz.make()
+    main.copilot.systems["zammad"] = fz.make()
     r = TestClient(main.app).post("/webhooks/zammad", json=ZM)
     assert r.status_code == 201
     sent = [(q.method, q.url.path) for q in fz.requests]
@@ -88,7 +88,7 @@ def test_zammad_wire_format_internal_note():
 def test_zammad_public_reply_is_not_internal():
     fz = FakeZammad()
     fz.seed(55)
-    state.systems["zammad"] = fz.make()
+    main.copilot.systems["zammad"] = fz.make()
     c = TestClient(main.app)
     tid = c.post("/webhooks/zammad", json=ZM).json()["id"]
     fz.requests.clear()
@@ -150,6 +150,6 @@ def test_unknown_system_is_404():
 def test_systems_are_built_from_env(monkeypatch):
     monkeypatch.setenv("ZAMMAD_URL", "https://z.example.com")
     monkeypatch.setenv("ZAMMAD_TOKEN", "t")
-    from app.ticketsystems import build_systems
+    from support_copilot.ticketsystems import build_systems
     s = build_systems()
     assert s["zammad"].configured and not s["zendesk"].configured

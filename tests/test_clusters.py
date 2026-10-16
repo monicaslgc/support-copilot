@@ -6,10 +6,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db, main, reviews, state
-from app.clusters import Item, find_cluster, find_duplicate, jaccard, same_customer
-from app.db import connect
-from app.models import Review
+from support_copilot import db, main
+from support_copilot.clusters import Item, find_cluster, find_duplicate, jaccard, same_customer
+from support_copilot.db import connect
+from support_copilot.models import Review
 from tests.fakes import FakeZendesk
 
 T0 = datetime(2026, 10, 16, 10, 0, tzinfo=UTC)
@@ -142,7 +142,7 @@ def test_unrelated_tickets_are_not_linked(clock):
 
 def test_tickets_system_notes_and_tags_explain_the_link(clock):
     fz = FakeZendesk()
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     for i, who in enumerate(["Ana", "Rui", "Sam"]):
         clock.minutes = i * 3
@@ -160,7 +160,7 @@ def test_tickets_system_notes_and_tags_explain_the_link(clock):
 
 def test_possible_duplicate_is_flagged_for_the_same_customer_only(clock):
     fz = FakeZendesk()
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     for i, who in enumerate(["Sam", "Sam", "Ana"]):
         clock.minutes = i
@@ -173,7 +173,7 @@ def test_possible_duplicate_is_flagged_for_the_same_customer_only(clock):
 
 def _spike_with_zendesk(clock, customers=("Ana", "Rui", "Sam")):
     fz = FakeZendesk()
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     for i, who in enumerate(customers):
         clock.minutes = i
@@ -219,7 +219,7 @@ def test_bulk_skips_tickets_already_reviewed_and_keeps_going(clock):
 
 def test_bulk_skips_a_ticket_a_colleague_reviews_mid_batch(clock, monkeypatch):
     c, fz, cl = _spike_with_zendesk(clock)
-    ids, real, calls = cl["pending_ids"], reviews.apply_review, []
+    ids, real, calls = cl["pending_ids"], main.copilot.review, []
 
     def racing(tid, r):
         if not calls:  # while we handle the first ticket, a colleague approves the second one
@@ -227,7 +227,7 @@ def test_bulk_skips_a_ticket_a_colleague_reviews_mid_batch(clock, monkeypatch):
             real(ids[1], Review(action="approved", reviewer="colleague", edited_reply="Colleague handled it."))
         return real(tid, r)
 
-    monkeypatch.setattr(reviews, "apply_review", racing)
+    monkeypatch.setattr(main.copilot, "review", racing)
     r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "monica"}).json()
     assert r["reviewed"] == [ids[0], ids[2]] and r["skipped"] == [ids[1]]
     assert fz.public(301) == ["Colleague handled it."]                       # no second reply to that customer

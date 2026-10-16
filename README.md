@@ -92,8 +92,8 @@ Full list and next steps: [limitations](docs/limitations.md).
 Needs Python 3.11 or newer. No API key and no account are needed.
 
 ```bash
-pip install -r requirements-dev.txt   # or: make install
-uvicorn app.main:app --reload          # review page at http://127.0.0.1:8000/
+pip install -e ".[dev]"   # or: make install
+uvicorn support_copilot.main:app --reload          # review page at http://127.0.0.1:8000/
 python scripts/seed_demo.py            # in another terminal: loads sample tickets
 python scripts/demo.py all             # plays the user stories against the server and checks each outcome
 pytest                                 # 332 tests, offline

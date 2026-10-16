@@ -5,11 +5,11 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main, state
-from app.classifier import apply_sentiment, classify, classify_rules
-from app.drafting import _template, draft_reply
-from app.models import Category, Priority, Sentiment, Triage
-from app.text import detect_language, rule_sentiment
+from support_copilot import main
+from support_copilot.classifier import apply_sentiment, classify, classify_rules
+from support_copilot.drafting import _template, draft_reply
+from support_copilot.models import Category, Priority, Sentiment, Triage
+from support_copilot.text import detect_language, rule_sentiment
 from tests.fakes import FakeZendesk
 from tests.test_llm import GOOD, FakeAnthropic, block, reply
 
@@ -154,7 +154,7 @@ def test_an_upset_customer_gets_an_apology_in_their_language():
 
 
 def test_every_language_has_every_phrase():
-    from app.drafting import _WORDS
+    from support_copilot.drafting import _WORDS
     assert all(set(w) == set(_WORDS["en"]) for w in _WORDS.values())
 
 
@@ -172,7 +172,7 @@ def test_tickets_expose_sentiment_and_language_and_the_system_gets_tags_and_a_no
     fz = FakeZendesk()
     fz.seed(1)
     fz.seed(2)
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     upset = fz.payload(1, "Isto é inaceitável", "Pagamento duplicado, péssimo serviço!!", "Rui")
     calm = fz.payload(2, "Duplicate charge", "I was charged twice, can you refund my invoice?", "Sam")
@@ -227,7 +227,7 @@ def test_unknown_customers_have_no_history():
 
 def test_repeat_customers_are_called_out_in_the_internal_note():
     fz = FakeZendesk()
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     make(c, "Export fails", "export fails", "Rui")
     fz.seed(7)
@@ -238,9 +238,10 @@ def test_repeat_customers_are_called_out_in_the_internal_note():
 def test_tickets_stored_before_this_feature_still_load():
     old = json.dumps({"triage": {"category": "bug", "priority": "P3", "team": "engineering", "confidence": 0.6,
                                  "rationale": "old", "source": "rules"}, "articles": [], "draft_reply": "Hi"})
-    state.conn.execute("INSERT INTO tickets (created_at, subject, body, customer, suggestion) VALUES (?,?,?,?,?)",
-                      ("2026-10-01T09:00:00+00:00", "Old ticket", "from an older version", "Ana", old))
-    state.conn.commit()
+    main.copilot.conn.execute(
+        "INSERT INTO tickets (created_at, subject, body, customer, suggestion) VALUES (?,?,?,?,?)",
+        ("2026-10-01T09:00:00+00:00", "Old ticket", "from an older version", "Ana", old))
+    main.copilot.conn.commit()
     c = TestClient(main.app)
     t = c.get("/tickets").json()[0]
     assert t["suggestion"]["triage"].get("sentiment") is None and t["history"]["count"] == 0
@@ -259,7 +260,7 @@ def test_tickets_stored_before_this_feature_still_load():
 def test_portuguese_tickets_are_classified_and_matched(subject, body, category, article):
     t = classify_rules(subject, body)
     assert t.category is category and t.language == "pt"
-    assert state.kb.search(f"{subject} {body}")[0]["id"] == article
+    assert main.copilot.kb.search(f"{subject} {body}")[0]["id"] == article
 
 
 def test_the_portuguese_outage_is_p1():

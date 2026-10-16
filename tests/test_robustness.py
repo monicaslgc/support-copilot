@@ -4,7 +4,7 @@ import threading
 import pytest
 from fastapi.testclient import TestClient
 
-from app import ingest, main, state
+from support_copilot import main
 from tests.fakes import FakeZendesk
 
 HOOK = {"ticket_id": "1", "subject": "Duplicate charge on invoice", "description": "refund my invoice please"}
@@ -26,7 +26,7 @@ def run_threads(n, fn):
 def test_simultaneous_reviews_exactly_one_wins():
     fz = FakeZendesk()
     fz.seed(1)
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
     tid = TestClient(main.app).post("/webhooks/zendesk", json=HOOK).json()["id"]
 
     codes = run_threads(8, lambda i: TestClient(main.app).post(
@@ -35,20 +35,20 @@ def test_simultaneous_reviews_exactly_one_wins():
 
     assert sorted(codes) == [200] + [409] * 7
     assert len(fz.public(1)) == 1                                            # the customer got ONE reply
-    assert state.conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
+    assert main.copilot.conn.execute("SELECT COUNT(*) FROM reviews").fetchone()[0] == 1
 
 
 def test_simultaneous_identical_webhooks_create_one_ticket_and_one_note():
     fz = FakeZendesk()
     fz.seed(1)
-    state.systems["zendesk"] = fz.make()
+    main.copilot.systems["zendesk"] = fz.make()
 
     results = run_threads(8, lambda i: TestClient(main.app).post("/webhooks/zendesk", json=HOOK))
 
     assert all(r.status_code == 201 for r in results)                        # no 500 from a unique-constraint race
     assert len({r.json()["id"] for r in results}) == 1
     assert sum(1 for r in results if r.json().get("duplicate")) == 7
-    assert state.conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 1
+    assert main.copilot.conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 1
     assert len(fz.internal(1)) == 1
 
 
@@ -56,15 +56,15 @@ def test_duplicate_detected_after_triage_does_not_push_twice(monkeypatch):
     """Deterministic version of the race: an identical webhook completes while we are still triaging."""
     fz = FakeZendesk()
     fz.seed(1)
-    state.systems["zendesk"] = fz.make()
-    real_suggest = ingest.suggest
+    main.copilot.systems["zendesk"] = fz.make()
+    real_suggest = main.copilot.suggest
 
     def suggest_then_lose_the_race(t):
         s = real_suggest(t)
-        ingest.store(t, s, "zendesk", "1")      # the other delivery wins here
+        main.copilot.store(t, s, "zendesk", "1")      # the other delivery wins here
         return s
 
-    monkeypatch.setattr(ingest, "suggest", suggest_then_lose_the_race)
+    monkeypatch.setattr(main.copilot, "suggest", suggest_then_lose_the_race)
     r = TestClient(main.app).post("/webhooks/zendesk", json=HOOK)
     assert r.status_code == 201 and r.json().get("duplicate") is True
     assert fz.requests == []                    # the loser must not write to the ticket system

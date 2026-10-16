@@ -5,7 +5,12 @@ from datetime import UTC, datetime
 
 
 def connect(path: str | None = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(path or os.getenv("TRIAGE_DB", "triage.db"), check_same_thread=False)
+    """Open (and create or upgrade) the database. Without a path: TRIAGE_DB, else ./triage.db."""
+    return init(sqlite3.connect(path or os.getenv("TRIAGE_DB", "triage.db"), check_same_thread=False))
+
+
+def init(conn: sqlite3.Connection) -> sqlite3.Connection:
+    """Create or upgrade the tables on a connection you opened yourself."""
     conn.row_factory = sqlite3.Row
     conn.executescript(
         """

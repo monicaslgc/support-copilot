@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main
-from app.ticketsystems import ZammadSystem, ZendeskSystem
+from support_copilot import main
+from support_copilot.ticketsystems import ZammadSystem, ZendeskSystem
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("demo", ROOT / "scripts" / "demo.py")

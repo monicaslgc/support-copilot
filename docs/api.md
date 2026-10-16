@@ -4,6 +4,8 @@ Back to the [README](../README.md).
 
 ## API
 
+These are the routes of `create_router(copilot)` (see the [embedding guide](embedding.md)); the reference server mounts them at the root and adds `/` and `/health`. Each has a `Copilot` method of the same purpose, so you can use it without HTTP.
+
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/` | The review queue page (no data of its own: it calls the API below) |

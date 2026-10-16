@@ -1,9 +1,9 @@
 # Examples
 
-Payloads and commands you can run against a local server. Start it first (see the [README](../README.md#try-it)):
+Payloads and commands you can run against a local server. Start it first (see the [README](../README.md#run-the-reference-server)):
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn support_copilot.main:app --reload
 ```
 
 Nothing below needs a ticket-system account: without credentials the adapters run in **dry-run**, which records the exact requests they would send under `/outbox` and sends nothing.

@@ -2,8 +2,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main
-from app.feedback import breakdown, wilson_lower
+from support_copilot import main
+from support_copilot.feedback import breakdown, wilson_lower
 
 BILLING = ("Duplicate charge", "I was charged twice, I want a refund for this invoice")     # AI: billing / P3
 BUG = ("Save fails", "I get an error and the page crashes when saving")                      # AI: bug / P2

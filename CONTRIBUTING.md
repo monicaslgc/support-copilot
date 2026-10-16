@@ -5,7 +5,7 @@ Thanks for looking. This is a small, concept-stage project, and changes are welc
 ## Set up
 
 ```bash
-make install   # Python 3.11+, installs requirements-dev.txt
+make install   # Python 3.11+, `pip install -e ".[dev]"`
 make check     # ruff and the full offline test suite: this is what CI runs
 make run       # review page at http://127.0.0.1:8000/
 ```
@@ -16,10 +16,10 @@ No API key or ticket-system account is needed for any of it.
 
 | Path | What lives there |
 |---|---|
-| `app/routes/` | HTTP endpoints, one module per topic |
-| `app/ingest.py`, `app/reviews.py`, `app/queries.py` | The write path, the human decision, and what is shown next to a ticket |
-| `app/state.py` | The database, knowledge base and adapters. Read them as `state.conn`, never `from .state import conn` |
-| `app/ticketsystems/` | One adapter per ticket system behind a shared interface |
+| `support_copilot/copilot.py` | The `Copilot` class: triage, the queue, the human decision, webhooks. No web framework, no global state |
+| `support_copilot/api.py` | The FastAPI router over a `Copilot`; `main.py` is the reference server around it |
+| `support_copilot/ticketsystems/` | One adapter per ticket system behind a shared interface |
+| `support_copilot/{classifier,drafting,guardrails,clusters,feedback,llm}.py` | The rules and the model calls |
 | `tests/` | Offline tests: stateful fakes of the ticket systems, a fake Anthropic SDK |
 | `docs/` | Documentation; `tests/test_docs.py` checks its links and the numbers it quotes |
 

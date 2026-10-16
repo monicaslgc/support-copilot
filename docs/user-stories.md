@@ -9,7 +9,7 @@ There are four kinds of people:
 - **The admin** connects the ticket system and keeps it safe.
 - **The customer** never sees the tool, but is the one a mistake would reach.
 
-To watch the scenarios, start the server (`uvicorn app.main:app`) and run `python scripts/demo.py all`, or `python scripts/demo.py list` to see which scenario covers which story. Add `--in-process` to run without a server. A story with no scenario is covered by its test alone.
+To watch the scenarios, start the server (`uvicorn support_copilot.main:app`) and run `python scripts/demo.py all`, or `python scripts/demo.py list` to see which scenario covers which story. Add `--in-process` to run without a server. A story with no scenario is covered by its test alone.
 
 | Story | In short | Scenario |
 |---|---|---|
