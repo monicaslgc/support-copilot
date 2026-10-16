@@ -1,4 +1,5 @@
 """The documentation does not rot: links, images, anchors and the numbers it quotes."""
+import importlib.util
 import re
 import subprocess
 import sys
@@ -66,3 +67,41 @@ def test_the_test_count_quoted_in_the_docs_is_the_real_one():
     for doc in (ROOT / "README.md", ROOT / "docs" / "engineering.md"):
         quoted = {int(n) for n in re.findall(r"\b(\d+) tests\b", doc.read_text(encoding="utf-8"))}
         assert quoted == {count}, f"{doc.name} says {sorted(quoted)} tests, there are {count}"
+
+
+def _stories() -> dict[str, str]:
+    """US-xx -> the text of its section in docs/user-stories.md."""
+    doc = (ROOT / "docs" / "user-stories.md").read_text(encoding="utf-8")
+    parts = re.split(r"(?m)^(?=### US-)", doc)[1:]
+    return {re.match(r"### (US-\d+)", p).group(1): p for p in parts}
+
+
+def _demo_scenarios() -> dict:
+    spec = importlib.util.spec_from_file_location("demo", ROOT / "scripts" / "demo.py")
+    demo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(demo)
+    return demo.SCENARIOS
+
+
+def test_every_user_story_has_a_test_and_every_story_test_has_a_story():
+    stories = _stories()
+    assert len(stories) == 11
+    code = (ROOT / "tests" / "test_user_stories.py").read_text(encoding="utf-8")
+    defined = set(re.findall(r"(?m)^def (test_us\d+\w*)\(", code))
+    referenced = set(re.findall(r"test_user_stories\.py::(test_us\d+\w*)", "\n".join(stories.values())))
+    assert referenced == defined, f"dangling: {referenced - defined}, undocumented: {defined - referenced}"
+    for story_id, text in stories.items():
+        number = story_id.split("-")[1]
+        assert re.search(rf"::test_us{number}\w*", text), f"{story_id} names no test"
+        assert "**As**" in text and "Acceptance criteria:" in text, f"{story_id} is missing its story or criteria"
+
+
+def test_the_scenarios_the_stories_point_to_exist_and_cover_them():
+    scenarios = _demo_scenarios()
+    for story_id, text in _stories().items():
+        for name in re.findall(r"python scripts/demo\.py (\w+)", text):
+            assert name in scenarios, f"{story_id} points to a scenario that does not exist: {name}"
+            assert story_id in scenarios[name][1], f"{story_id} points to '{name}', which does not cover it"
+    covered = {story for _, stories in scenarios.values() for story in re.findall(r"US-\d+", stories)}
+    for story in covered:
+        assert "python scripts/demo.py" in _stories()[story], f"{story} has a scenario the document does not show"
