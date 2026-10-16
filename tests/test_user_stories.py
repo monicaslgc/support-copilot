@@ -12,7 +12,7 @@ import sys
 import httpx
 from fastapi.testclient import TestClient
 
-from app import main
+from app import ingest, main, state
 from app.ticketsystems import ZendeskSystem
 from tests.fakes import FakeZammad, FakeZendesk
 from tests.test_clusters import OUTAGES
@@ -53,7 +53,7 @@ def test_us01_a_new_ticket_arrives_triaged_with_a_draft():
     fz = FakeZammad()
     for i in (1, 2):
         fz.seed(i)
-    main.systems["zammad"] = fz.make()
+    state.systems["zammad"] = fz.make()
     c = TestClient(main.app)
 
     arrived = c.post("/webhooks/zammad", json=fz.payload(1, *BILLING, "Sam")).json()["suggestion"]
@@ -72,7 +72,7 @@ def test_us02_nothing_reaches_the_customer_until_approved():
     fz = FakeZendesk()
     for i in (1, 2):
         fz.seed(i)
-    main.systems["zendesk"] = fz.make()
+    state.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     first = c.post("/webhooks/zendesk", json=fz.payload(1, *BILLING, "Sam")).json()["id"]
     second = c.post("/webhooks/zendesk", json=fz.payload(2, *BILLING, "Ana")).json()["id"]
@@ -127,7 +127,7 @@ def test_us05_promises_are_flagged_before_they_are_sent(monkeypatch):
     model_replies(monkeypatch, "Hi, we will refund you in full today.")           # the model promises a refund
     fz = FakeZendesk()
     fz.seed(1)
-    main.systems["zendesk"] = fz.make()
+    state.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
 
     made = c.post("/webhooks/zendesk", json=fz.payload(1, *BILLING, "Sam")).json()
@@ -206,14 +206,14 @@ def test_us08_the_reasons_for_corrections_are_recorded_and_counted():
 # -------------------------------------------------------------------------------------- the admin
 def test_us09_the_ticket_system_can_be_connected_safely(monkeypatch):
     triaged = []                                                                 # how often the AI is asked
-    real_suggest = main._suggest
-    monkeypatch.setattr(main, "_suggest", lambda t: triaged.append(t) or real_suggest(t))
+    real_suggest = ingest.suggest
+    monkeypatch.setattr(ingest, "suggest", lambda t: triaged.append(t) or real_suggest(t))
     monkeypatch.setenv("ZAMMAD_WEBHOOK_SECRET", "s3cret")
     monkeypatch.setenv("ZENDESK_WEBHOOK_SECRET", "s3cret")
     zammad, zendesk = FakeZammad(), FakeZendesk()
     zammad.seed(1, tags=["vip"])
     zendesk.seed(2, tags=["renewal"])
-    main.systems["zammad"], main.systems["zendesk"] = zammad.make(), zendesk.make()
+    state.systems["zammad"], state.systems["zendesk"] = zammad.make(), zendesk.make()
     c = TestClient(main.app)
 
     raw = json.dumps(zammad.payload(1, *BILLING, "Sam")).encode()
@@ -239,7 +239,7 @@ def test_us09_the_ticket_system_can_be_connected_safely(monkeypatch):
 
 def test_us10_a_ticket_system_outage_loses_nothing():
     down = ZendeskSystem("acme", "a@acme.com", "tok", transport=httpx.MockTransport(lambda req: httpx.Response(503)))
-    main.systems["zendesk"] = down
+    state.systems["zendesk"] = down
     c = TestClient(main.app)
     fz = FakeZendesk()
     made = c.post("/webhooks/zendesk", json=fz.payload(9, *BILLING, "Sam"))

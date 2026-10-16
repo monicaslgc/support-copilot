@@ -5,7 +5,7 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main
+from app import main, state
 from app.guardrails import describe, explain, find_commitments, hard_commitments, redact
 from tests.fakes import FakeZendesk
 from tests.test_llm import GOOD, FakeAnthropic, block, reply
@@ -201,7 +201,7 @@ def test_the_internal_note_tells_the_agent_what_to_check_and_what_was_masked(fak
     model_says(fake, "Hi Ana, refunds are processed within 5 days after approval.")
     fz = FakeZendesk()
     fz.seed(1)
-    main.systems["zendesk"] = fz.make()
+    state.systems["zendesk"] = fz.make()
     c = TestClient(main.app)
     c.post("/webhooks/zendesk", json=fz.payload(1, "Duplicate charge on invoice", BODY, "Ana"))
     note = fz.internal(1)[0]
@@ -241,8 +241,8 @@ def test_a_person_can_still_send_a_promise_and_is_told_about_it():
 def test_tickets_stored_before_this_feature_still_load():
     old = json.dumps({"triage": {"category": "bug", "priority": "P3", "team": "engineering", "confidence": 0.6,
                                  "rationale": "old", "source": "rules"}, "articles": [], "draft_reply": "Hi"})
-    main.conn.execute("INSERT INTO tickets (created_at, subject, body, customer, suggestion) VALUES (?,?,?,?,?)",
+    state.conn.execute("INSERT INTO tickets (created_at, subject, body, customer, suggestion) VALUES (?,?,?,?,?)",
                       ("2026-10-01T09:00:00+00:00", "Old ticket", "from an older version", "Ana", old))
-    main.conn.commit()
+    state.conn.commit()
     t = TestClient(main.app).get("/tickets").json()[0]
     assert t["suggestion"]["draft_reply"] == "Hi" and "warnings" not in t["suggestion"]

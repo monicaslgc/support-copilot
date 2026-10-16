@@ -1,0 +1,29 @@
+.PHONY: help install run seed demo test lint check clean
+.DEFAULT_GOAL := help
+
+help:  ## list the commands
+	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-8s %s\n", $$1, $$2}'
+
+install:  ## install runtime and development dependencies
+	pip install -r requirements-dev.txt
+
+run:  ## start the app and review page at http://127.0.0.1:8000/
+	uvicorn app.main:app --reload
+
+seed:  ## load sample tickets into a running server
+	python scripts/seed_demo.py
+
+demo:  ## play the user stories against a running server
+	python scripts/demo.py all
+
+test:  ## run the tests (offline)
+	pytest -q
+
+lint:  ## style and bug checks
+	ruff check .
+
+check: lint test  ## what CI runs
+
+clean:  ## remove caches and local databases
+	rm -rf .pytest_cache .ruff_cache *.db
+	find . -name __pycache__ -type d -prune -exec rm -rf {} +

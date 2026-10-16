@@ -7,7 +7,7 @@ os.environ["TRIAGE_DB"] = ":memory:"
 
 import pytest
 
-import app.main as main
+from app import state
 from app.db import connect
 from app.ticketsystems import build_systems
 
@@ -17,6 +17,6 @@ def isolated_state(monkeypatch):
     """Every test gets a fresh DB and dry-run adapters (no credentials); nothing leaks between tests."""
     for var in ("ZENDESK_SUBDOMAIN", "ZENDESK_EMAIL", "ZENDESK_API_TOKEN", "ZAMMAD_URL", "ZAMMAD_TOKEN"):
         monkeypatch.delenv(var, raising=False)
-    main.conn = connect(":memory:")
-    main.systems = build_systems()
+    state.conn = connect(":memory:")
+    state.systems = build_systems()
     yield

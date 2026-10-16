@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import app.main as main
+from app import main, state
 from tests.fakes import FakeZammad, FakeZendesk
 
 SAMPLES = json.loads((Path(__file__).parent.parent / "data" / "sample_tickets.json").read_text())
@@ -19,7 +19,7 @@ class Env:
     def __init__(self, fake):
         self.fake, self.name = fake, fake.name
         self.c = TestClient(main.app)
-        main.systems[fake.name] = fake.make()
+        state.systems[fake.name] = fake.make()
 
     def hook(self, tid, subject, desc, who="Sam"):
         return self.c.post(f"/webhooks/{self.name}", json=self.fake.payload(tid, subject, desc, who))

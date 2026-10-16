@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main
+from app import ingest, main, security, state
 from app.db import connect
 from app.models import Suggestion, TicketIn, Triage
 from tests.fakes import FakeZendesk
@@ -47,7 +47,7 @@ def test_the_earliest_same_topic_ticket_is_found_however_far_back_it_is():
 
 
 def test_near_identical_text_is_only_searched_among_the_most_recent_tickets(monkeypatch):
-    monkeypatch.setattr(main, "SIMILARITY_SCAN", 3)
+    monkeypatch.setattr(ingest, "SIMILARITY_SCAN", 3)
     c = TestClient(main.app)
     text = ("Totally unrelated words about turquoise elephants dancing",
             "turquoise elephants dancing everywhere tonight")
@@ -64,14 +64,14 @@ def test_the_lookups_use_indexes_instead_of_scanning_the_table():
     for i in range(20):
         make(c, *OUTAGE, customer=f"c{i}")
     seen = []
-    main.conn.set_trace_callback(seen.append)
+    state.conn.set_trace_callback(seen.append)
     make(c, *OUTAGE, customer="newcomer")
-    main.conn.set_trace_callback(None)
+    state.conn.set_trace_callback(None)
     by_topic = [q for q in seen if q.lstrip().startswith("SELECT") and "topic =" in q]
     by_customer = [q for q in seen if q.lstrip().startswith("SELECT") and "lower(customer) =" in q]
     assert len(by_topic) == len(by_customer) == 1              # one row each, found through its own index
     for sql, index in ((by_topic[0], "ix_tickets_topic"), (by_customer[0], "ix_tickets_customer")):
-        plan = " ".join(str(r[3]) for r in main.conn.execute("EXPLAIN QUERY PLAN " + sql))
+        plan = " ".join(str(r[3]) for r in state.conn.execute("EXPLAIN QUERY PLAN " + sql))
         assert index in plan, plan
         assert "SCAN tickets" not in plan, plan
 
@@ -82,14 +82,14 @@ def test_a_real_data_error_is_raised_not_mistaken_for_a_repeated_webhook():
                                  source="rules"), articles=[], draft_reply="Hi")
     broken = TicketIn.model_construct(subject=None, body="Body", customer="Ana")       # NOT NULL column
     with pytest.raises(sqlite3.IntegrityError):
-        main._store(broken, s)
+        ingest.store(broken, s)
 
 
 def test_the_unique_key_still_deduplicates_quietly():
     c = TestClient(main.app)
     fz = FakeZendesk()
     fz.seed(5)
-    main.systems["zendesk"] = fz.make()
+    state.systems["zendesk"] = fz.make()
     a = c.post("/webhooks/zendesk", json=fz.payload(5, *OUTAGE, "Ana")).json()
     assert c.post("/webhooks/zendesk", json=fz.payload(5, *OUTAGE, "Ana")).json() == {"id": a["id"], "duplicate": True}
 
@@ -128,16 +128,16 @@ def test_category_and_priority_are_filled_in_for_tickets_from_an_older_database(
 # ---------------- an open deployment is called out ----------------
 def connected(monkeypatch):
     fz = FakeZendesk()
-    main.systems["zendesk"] = fz.make()                        # has credentials, so it is "connected"
+    state.systems["zendesk"] = fz.make()                        # has credentials, so it is "connected"
 
 
 def test_nothing_to_warn_about_before_a_ticket_system_is_connected():
-    assert main.security_warnings() == []
+    assert security.security_warnings() == []
 
 
 def test_a_connected_system_without_secrets_is_called_out(monkeypatch):
     connected(monkeypatch)
-    warnings = main.security_warnings()
+    warnings = security.security_warnings()
     assert len(warnings) == 2
     assert "ZENDESK_WEBHOOK_SECRET is not set" in warnings[0] and "API_KEY is not set" in warnings[1]
 
@@ -145,14 +145,13 @@ def test_a_connected_system_without_secrets_is_called_out(monkeypatch):
 def test_setting_the_secret_and_the_key_clears_the_warnings(monkeypatch):
     connected(monkeypatch)
     monkeypatch.setenv("ZENDESK_WEBHOOK_SECRET", "s")
-    assert len(main.security_warnings()) == 1
+    assert len(security.security_warnings()) == 1
     monkeypatch.setenv("API_KEY", "k")
-    assert main.security_warnings() == []
+    assert security.security_warnings() == []
 
 
 def test_the_warnings_are_logged_at_startup(monkeypatch, caplog):
     connected(monkeypatch)
     with caplog.at_level("WARNING", logger="support_copilot"):
-        for w in main.security_warnings():
-            main.log.warning(w)
+        security.log_startup_warnings()
     assert "ZENDESK_WEBHOOK_SECRET is not set" in caplog.text

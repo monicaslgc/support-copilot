@@ -263,11 +263,11 @@ def in_process_client():
     os.environ["TRIAGE_DB"] = ":memory:"
     from fastapi.testclient import TestClient
 
-    from app import main
+    from app import main, state
     from app.db import connect
     from app.ticketsystems import build_systems
 
-    main.conn, main.systems = connect(":memory:"), build_systems()
+    state.conn, state.systems = connect(":memory:"), build_systems()
     return TestClient(main.app)
 
 
