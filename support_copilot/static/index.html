@@ -6,6 +6,13 @@
 <title>Review queue</title>
 <link rel="icon" href="data:,">
 <style>
+/* The brand fonts ship with the package (support_copilot/static/fonts), so nothing is fetched from a third party. */
+@font-face { font-family: "DM Serif Display"; font-weight: 400; font-display: swap; src: url("/static/fonts/dm-serif-display-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("/static/fonts/inter-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("/static/fonts/inter-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("/static/fonts/inter-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/static/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("/static/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
 :root {
   /* Brand kit: Cream #F4F1E8, Sage #A0B3A0, Dark green #153D32, Charcoal #202A27, Muted green #6F8876 (decorative: too light for small text, so --muted is a darker shade of it). Rust and ochre are semantic only (warnings). */
   --cream: #F4F1E8; --sage: #A0B3A0; --forest: #153D32; --charcoal: #202A27; --muted-green: #6F8876;

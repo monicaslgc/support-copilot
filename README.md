@@ -7,7 +7,7 @@
 
 ![support-copilot: AI can prepare the answer; a person decides what gets sent. The workflow runs from ticket through triage, draft and human review to the customer.](docs/project-cover.svg)
 
-**A human-in-the-loop AI copilot for support tickets.** It triages each ticket, finds the right help article, drafts the reply in the customer's language and warns when a draft promises something it shouldn't. **A person approves every message before it reaches the customer**, and the app measures where the AI has earned more trust.
+**An add-on for the support setup you already have, not another app to adopt.** It listens to your helpdesk (Zendesk, Zammad or your own), triages each ticket, drafts a reply in the customer's language from your help articles, and writes the result back as an internal note and tags your own triggers can route on. **A person approves every message before it reaches the customer**, by tagging the ticket in the helpdesk they already use, and the add-on measures where the AI has earned more trust. It is a Python library with an optional FastAPI router and an optional review page: bring your own ticket system, help articles, database file and tag names.
 
 > **Status: concept / portfolio project**, built from scratch with synthetic data. The Zammad and Zendesk adapters follow the vendors' documented APIs but have only been tested against stateful fakes, and the Claude calls only against a fake SDK. Nothing here has run against a live ticket system or the live API yet. See [what is not verified](docs/limitations.md).
 
@@ -34,14 +34,16 @@ This project explores the cautious end of that question: **the AI only suggests,
 |---|---|
 | **Triage** | Category, P1-P4 priority, owning team, sentiment and language. Claude when an API key is set, plain rules otherwise. [How](docs/features.md#how-the-ai-part-works-claude-or-rules) |
 | **Grounded drafts** | Finds the matching knowledge-base article and drafts a reply in the customer's language, with an apology if they are upset. |
-| **Review queue** | Sorted by urgency. Edit the reply, override the triage, approve or reject. The reply that was actually sent is kept. [The page](docs/features.md#the-review-page) |
+| **Decide in your helpdesk** | The note on the ticket says: add `ai_approve` to send the drafted reply, `ai_reject` to answer yourself. The decision is attributed to the agent. [Setup](docs/integrations.md#deciding-from-inside-the-helpdesk) |
+| **Review page** (optional) | Sorted by urgency. Edit the reply, override the triage, approve or reject, answer an incident in one click. The reply that was actually sent is kept. [The page](docs/features.md#the-review-page) |
 | **Incidents and duplicates** | Groups tickets about the same issue. Several customers become a possible incident, answered with one click. [Details](docs/features.md#duplicates-and-incident-spikes) |
 | **Customer context** | Earlier tickets from the same customer; an upset customer moves a routine ticket up a level. [Details](docs/features.md#sentiment-language-and-customer-context) |
 | **Feedback loop** | Records why a reviewer corrected the AI, and reports per category how often it was right. [Details](docs/features.md#feedback-why-people-correct-the-ai-and-where-it-has-earned-more-autonomy) |
 | **Guardrails** | Masks emails, cards, IBANs, phones and passwords before the model sees them, and flags refund or deadline promises in drafts. [Details](docs/features.md#guardrails-around-the-model) |
+| **Your names and tags** | Every tag, category name and team name it writes is yours to set, so your triggers and views route on them. [Taxonomy](docs/embedding.md#your-tags-names-and-who-may-decide) |
 | **Ticket systems** | Zammad and Zendesk behind one interface: the AI's notes stay internal, tags are added never replaced, and the public reply only goes out after approval. [Details](docs/integrations.md) |
 
-Eleven [user stories](docs/user-stories.md) (support agents, support leads, admins) spell out what each role needs. Each one is checked by a test, and most by a scenario you can watch run.
+Twelve [user stories](docs/user-stories.md) (support agents, support leads, admins) spell out what each role needs. Each one is checked by a test, and most by a scenario you can watch run.
 
 ## See it in action
 
@@ -72,8 +74,8 @@ Eleven [user stories](docs/user-stories.md) (support agents, support leads, admi
 
 ## How it is validated
 
-- **332 tests** on Python 3.11 and 3.12, with `ruff`, in CI. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's brand tokens, contrast ratios and approval controls.
-- **User stories are executable:** each of the eleven stories has an acceptance test, and a test fails if a story, its test or its demo scenario drifts apart.
+- **378 tests** on Python 3.11 and 3.12, with `ruff`, in CI. They include the same end-to-end scenarios against both ticket-system fakes, every kind of unusable model reply, races (eight reviews of one ticket, eight identical webhooks), security checks and the review page's brand tokens, contrast ratios and approval controls.
+- **User stories are executable:** each of the twelve stories has an acceptance test, and a test fails if a story, its test or its demo scenario drifts apart.
 - **Mutation-checked:** I broke the code on purpose in dozens of ways (a swapped public and internal note, overwritten tags, a missing idempotency check, a promise let through) and made sure a test failed each time. Several did not at first, and each of those got a new test.
 - **Driven in a real browser** (Chromium) for the approve, reject and bulk flows and a hostile ticket that must show as text. That run is manual, not part of CI.
 - **Measured:** saving a ticket stays at about 6.5 ms from 100 to 2000 tickets in an hour. [Engineering notes](docs/engineering.md).
@@ -83,20 +85,36 @@ Eleven [user stories](docs/user-stories.md) (support agents, support leads, admi
 - It has not run against a real Zammad, Zendesk or the live Claude API.
 - Retrieval is lexical, and the rule-based fallbacks are baselines, not production classifiers.
 - The guardrails are rules with known gaps; the API key is one shared secret, not per-user auth.
-- One instance, one SQLite file. Fine for a few thousand tickets an hour, not more.
+- One process, one SQLite file (a path or a connection you provide); no other store behind an interface yet. Fine for a few thousand tickets an hour, not more.
 
 Full list and next steps: [limitations](docs/limitations.md).
 
-## Try it
+## Use it in your stack
 
-Needs Python 3.11 or newer. No API key and no account are needed.
+Not on PyPI yet: install from GitHub. Python 3.11 or newer; no API key and no account are needed to try it.
 
 ```bash
+pip install "support-copilot[fastapi] @ git+https://github.com/monicaslgc/support-copilot"   # add [claude] for model-backed triage
+```
+
+| You want | You use |
+|---|---|
+| Triage and a draft inside your own code | `Copilot().suggest(ticket)`: nothing is stored or sent. [`examples/library_usage.py`](examples/library_usage.py) |
+| The queue and webhooks in your FastAPI app | `app.include_router(create_router(Copilot(db=..., kb=...)))`. [`examples/embed_fastapi.py`](examples/embed_fastapi.py) |
+| Your tags, names and who may approve | `Copilot(taxonomy=Taxonomy(...), allowed_reviewers={...})`. [How](docs/embedding.md#your-tags-names-and-who-may-decide) |
+| Another ticket system | Implement `TicketSystem` and pass `Copilot(systems={...})`. [How](docs/integrations.md) |
+
+The core has no web-framework dependency. The [embedding guide](docs/embedding.md) covers your own help articles, database, API key and ticket systems.
+
+## Try it with the reference server
+
+```bash
+git clone https://github.com/monicaslgc/support-copilot && cd support-copilot
 pip install -e ".[dev]"   # or: make install
 uvicorn support_copilot.main:app --reload          # review page at http://127.0.0.1:8000/
 python scripts/seed_demo.py            # in another terminal: loads sample tickets
 python scripts/demo.py all             # plays the user stories against the server and checks each outcome
-pytest                                 # 332 tests, offline
+pytest                                 # 378 tests, offline
 ```
 
 `scripts/demo.py list` shows the scenarios. [`examples/`](examples/README.md) has ready-made Zammad and Zendesk payloads and the `curl` commands to send them, including signed ones. To use Claude, set `ANTHROPIC_API_KEY` (the model is `TRIAGE_MODEL`). To connect Zammad or Zendesk, see [integrations](docs/integrations.md). Every setting is in [API and configuration](docs/api.md).
@@ -104,6 +122,7 @@ pytest                                 # 332 tests, offline
 ## Documentation
 
 - [User stories](docs/user-stories.md): who needs what, with acceptance criteria, each checked by a test
+- [Embedding guide](docs/embedding.md): your own articles, database, API key, tags and ticket systems
 - [Examples](examples/README.md): payloads and `curl` commands for Zammad and Zendesk
 - [Features in detail](docs/features.md): the review page, Claude or rules, incidents, customer context, feedback, guardrails
 - [Ticket system integrations](docs/integrations.md): Zammad, Zendesk, adding another system

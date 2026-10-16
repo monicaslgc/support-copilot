@@ -25,7 +25,7 @@ Repository = "https://github.com/monicaslgc/support-copilot"
 include = ["support_copilot*"]
 
 [tool.setuptools.package-data]
-support_copilot = ["kb/*.md", "static/*.html"]
+support_copilot = ["kb/*.md", "static/*.html", "static/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

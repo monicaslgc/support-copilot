@@ -8,9 +8,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from support_copilot.main import app
 
-PAGE = (Path(__file__).resolve().parent.parent / "app" / "static" / "index.html").read_text(encoding="utf-8")
+STATIC = Path(__file__).resolve().parent.parent / "support_copilot" / "static"
+PAGE = (STATIC / "index.html").read_text(encoding="utf-8")
 
 
 def tokens(block: str) -> dict[str, str]:

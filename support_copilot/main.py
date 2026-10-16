@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import llm
 from .api import create_router
@@ -30,4 +31,5 @@ def health():
             "ticket_systems": {n: s.configured for n, s in copilot.systems.items()}}
 
 
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")  # the page's fonts
 app.include_router(create_router(copilot))

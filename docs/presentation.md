@@ -14,7 +14,7 @@ Everything uses the author's own brand kit (the LinkedIn Media Kit), not a new i
 | Charcoal | `#202A27` | body text |
 | Muted green | `#6F8876` | secondary and decorative elements |
 
-Typography: DM Serif Display for headings, Inter for text and JetBrains Mono for technical labels. The page asks for them by name with system fallbacks and loads nothing from the network, so on a machine without them it looks plainer, not broken. The kit's muted green is too light for small text (about 3.3:1 on cream), so the review page uses a darker shade of it (`#4C6354`) for secondary text; `tests/test_ui.py` checks that every text pair keeps at least 4.5:1 in light and dark mode. Rust and ochre appear only for warnings (promises, possible incidents), so they stand out.
+Typography: DM Serif Display for headings, Inter for text and JetBrains Mono for technical labels. The fonts are OFL-licensed and ship with the package (`support_copilot/static/fonts`, served from `/static/fonts`), so the page shows them everywhere and still loads nothing from a third party; system fonts remain the fallback. The kit's muted green is too light for small text (about 3.3:1 on cream), so the review page uses a darker shade of it (`#4C6354`) for secondary text; `tests/test_ui.py` checks that every text pair keeps at least 4.5:1 in light and dark mode. Rust and ochre appear only for warnings (promises, possible incidents), so they stand out.
 
 In the review page the three kinds of content are kept apart on purpose: the **customer's ticket** (a quote with a charcoal rule), the **AI suggestion** (sage panels labelled `AI SUGGESTION` and `AI DRAFT`) and the **human decision** (a dark-green bordered panel labelled `HUMAN`).
 

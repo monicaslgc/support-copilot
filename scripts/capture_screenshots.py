@@ -36,7 +36,7 @@ CLEAR = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ZAMMAD_URL", "ZAMMAD_TOKE
 
 STUB = """
 import json, uvicorn
-from app import llm
+from support_copilot import llm
 def complete(system, user, max_tokens=2048):
     if '"category"' in system:
         return json.dumps({"category": "billing", "priority": "P3", "confidence": 0.9,
@@ -45,7 +45,7 @@ def complete(system, user, max_tokens=2048):
     return "Hi Ana, thanks for reaching out. We are looking into the double charge."
 llm.complete = complete
 llm.enabled = lambda: True
-uvicorn.run("app.main:app", host="127.0.0.1", port=%d, log_level="warning")
+uvicorn.run("support_copilot.main:app", host="127.0.0.1", port=%d, log_level="warning")
 """
 
 
@@ -62,7 +62,8 @@ def server(stub: bool = False):
     with tempfile.TemporaryDirectory() as tmp:
         env["TRIAGE_DB"] = str(Path(tmp) / "demo.db")
         cmd = ([sys.executable, "-c", STUB % port] if stub
-               else [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port), "--log-level", "warning"])
+               else [sys.executable, "-m", "uvicorn", "support_copilot.main:app", "--port", str(port),
+                     "--log-level", "warning"])
         proc = subprocess.Popen(cmd, cwd=ROOT, env=env)
         url = f"http://127.0.0.1:{port}"
         try:
@@ -107,7 +108,8 @@ def font_css(fonts: Path | None) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--fonts", type=Path, help="folder with @fontsource woff2 files (optional)")
+    ap.add_argument("--fonts", type=Path, default=ROOT / "support_copilot" / "static" / "fonts",
+                    help="folder with @fontsource woff2 files (default: the ones the page ships)")
     ap.add_argument("--out", type=Path, default=DOCS)
     args = ap.parse_args()
     fonts = font_css(args.fonts)

@@ -1,6 +1,6 @@
 # Examples
 
-Payloads and commands you can run against a local server. Start it first (see the [README](../README.md#run-the-reference-server)):
+Payloads and commands you can run against a local server. Start it first (see the [README](../README.md#try-it-with-the-reference-server)):
 
 ```bash
 uvicorn support_copilot.main:app --reload
