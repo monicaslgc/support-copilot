@@ -1,31 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
-  <title id="title">Support Copilot — AI-assisted support, human-approved</title>
+  <title id="title">support-copilot: AI-assisted support, human-approved</title>
   <desc id="desc">Editorial project cover in cream, forest green, sage and charcoal. A workflow shows ticket, triage, draft, human review, and customer.</desc>
-  <rect width="1280" height="640" fill="#F6F2E9"/>
-  <rect x="48" y="48" width="1184" height="544" rx="4" fill="none" stroke="#263C32" stroke-opacity=".22"/>
-  <rect x="48" y="48" width="12" height="544" fill="#A8B29A"/>
-  <text x="92" y="108" fill="#353832" font-family="monospace" font-size="16" letter-spacing="3">INDEPENDENT PROJECT / APPLIED AI</text>
-  <text x="88" y="205" fill="#263C32" font-family="Georgia, 'Times New Roman', serif" font-size="76">Support Copilot</text>
-  <text x="92" y="257" fill="#353832" font-family="Arial, sans-serif" font-size="27">AI can prepare the answer.</text>
-  <text x="92" y="294" fill="#353832" font-family="Arial, sans-serif" font-size="27">A person decides what gets sent.</text>
-  <line x1="92" y1="336" x2="1188" y2="336" stroke="#263C32" stroke-opacity=".25"/>
-  <g font-family="Arial, sans-serif" font-size="17" text-anchor="middle">
-    <rect x="92" y="378" width="170" height="78" rx="3" fill="#FFFFFF" stroke="#263C32" stroke-opacity=".25"/>
-    <text x="177" y="423" fill="#353832">Ticket</text>
-    <path d="M272 417 H300 M292 409 L300 417 L292 425" fill="none" stroke="#263C32" stroke-width="2"/>
-    <rect x="310" y="378" width="170" height="78" rx="3" fill="#A8B29A" fill-opacity=".55" stroke="#263C32" stroke-opacity=".25"/>
-    <text x="395" y="423" fill="#263C32">Triage</text>
-    <path d="M490 417 H518 M510 409 L518 417 L510 425" fill="none" stroke="#263C32" stroke-width="2"/>
-    <rect x="528" y="378" width="170" height="78" rx="3" fill="#FFFFFF" stroke="#263C32" stroke-opacity=".25"/>
-    <text x="613" y="423" fill="#353832">Draft + checks</text>
-    <path d="M708 417 H736 M728 409 L736 417 L728 425" fill="none" stroke="#263C32" stroke-width="2"/>
-    <rect x="746" y="366" width="210" height="102" rx="3" fill="#263C32"/>
-    <text x="851" y="409" fill="#F6F2E9">Human review</text>
-    <text x="851" y="436" fill="#A8B29A" font-size="14">Approve or reject</text>
-    <path d="M966 417 H994 M986 409 L994 417 L986 425" fill="none" stroke="#263C32" stroke-width="2"/>
-    <rect x="1004" y="378" width="184" height="78" rx="3" fill="#FFFFFF" stroke="#263C32" stroke-opacity=".25"/>
-    <text x="1096" y="423" fill="#353832">Customer</text>
+  <rect width="1280" height="640" fill="#F4F1E8"/>
+  <rect x="48" y="48" width="1184" height="544" rx="4" fill="none" stroke="#153D32" stroke-opacity=".22"/>
+  <rect x="48" y="48" width="12" height="544" fill="#A0B3A0"/>
+  <text x="92" y="108" fill="#202A27" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="16" letter-spacing="3">INDEPENDENT PROJECT / APPLIED AI</text>
+  <text x="88" y="205" fill="#153D32" font-family="'DM Serif Display', Georgia, serif" font-size="76">support-copilot</text>
+  <text x="92" y="257" fill="#202A27" font-family="Inter, 'DM Sans', Arial, sans-serif" font-size="27">AI can prepare the answer.</text>
+  <text x="92" y="294" fill="#202A27" font-family="Inter, 'DM Sans', Arial, sans-serif" font-size="27">A person decides what gets sent.</text>
+  <line x1="92" y1="336" x2="1188" y2="336" stroke="#153D32" stroke-opacity=".25"/>
+  <g font-family="Inter, 'DM Sans', Arial, sans-serif" font-size="17" text-anchor="middle">
+    <rect x="92" y="378" width="170" height="78" rx="3" fill="#FFFFFF" stroke="#153D32" stroke-opacity=".25"/>
+    <text x="177" y="423" fill="#202A27">Ticket</text>
+    <path d="M272 417 H300 M292 409 L300 417 L292 425" fill="none" stroke="#153D32" stroke-width="2"/>
+    <rect x="310" y="378" width="170" height="78" rx="3" fill="#A0B3A0" fill-opacity=".55" stroke="#153D32" stroke-opacity=".25"/>
+    <text x="395" y="423" fill="#153D32">Triage</text>
+    <path d="M490 417 H518 M510 409 L518 417 L510 425" fill="none" stroke="#153D32" stroke-width="2"/>
+    <rect x="528" y="378" width="170" height="78" rx="3" fill="#FFFFFF" stroke="#153D32" stroke-opacity=".25"/>
+    <text x="613" y="423" fill="#202A27">Draft + checks</text>
+    <path d="M708 417 H736 M728 409 L736 417 L728 425" fill="none" stroke="#153D32" stroke-width="2"/>
+    <rect x="746" y="366" width="210" height="102" rx="3" fill="#153D32"/>
+    <text x="851" y="409" fill="#F4F1E8">Human review</text>
+    <text x="851" y="436" fill="#A0B3A0" font-size="14">Approve or reject</text>
+    <path d="M966 417 H994 M986 409 L994 417 L986 425" fill="none" stroke="#153D32" stroke-width="2"/>
+    <rect x="1004" y="378" width="184" height="78" rx="3" fill="#FFFFFF" stroke="#153D32" stroke-opacity=".25"/>
+    <text x="1096" y="423" fill="#202A27">Customer</text>
   </g>
-  <text x="92" y="526" fill="#353832" font-family="monospace" font-size="14">SYNTHETIC DATA · OFFLINE TESTS · NOT YET VERIFIED AGAINST LIVE SERVICES</text>
-  <text x="92" y="558" fill="#263C32" font-family="Georgia, 'Times New Roman', serif" font-size="20">Creative &amp; Analytical — Product · AI · Automation</text>
+  <text x="92" y="526" fill="#202A27" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="14">SYNTHETIC DATA · OFFLINE TESTS · NOT YET VERIFIED AGAINST LIVE SERVICES</text>
+  <text x="92" y="558" fill="#153D32" font-family="'DM Serif Display', Georgia, serif" font-size="20">Creative &amp; Analytical | Product + AI + Automation</text>
 </svg>

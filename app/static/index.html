@@ -7,74 +7,106 @@
 <link rel="icon" href="data:,">
 <style>
 :root {
-  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5d6778; --line: #dfe3ea;
-  --accent: #2f5bd8; --accent-ink: #ffffff; --ok: #1b7a46; --bad: #b3261e;
-  --p1: #b3261e; --p2: #b25a00; --p3: #2f5bd8; --p4: #5d6778; --focus: #2f5bd8;
+  /* Brand kit: Cream #F4F1E8, Sage #A0B3A0, Dark green #153D32, Charcoal #202A27, Muted green #6F8876 (decorative: too light for small text, so --muted is a darker shade of it). Rust and ochre are semantic only (warnings). */
+  --cream: #F4F1E8; --sage: #A0B3A0; --forest: #153D32; --charcoal: #202A27; --muted-green: #6F8876;
+  --bg: var(--cream); --panel: #FAF8F2; --ink: var(--charcoal); --muted: #4C6354; --line: #D6D9D0;
+  --accent: var(--forest); --accent-ink: var(--cream); --ai-bg: #E3EAE2; --ai-line: var(--sage);
+  --ok: var(--forest); --bad: #9B2F22; --bad-bg: #F6E4DA; --warn: #8A5A12; --warn-bg: #F3E8D2;
+  --p1: #9B2F22; --p2: #8A5A12; --p3: var(--forest); --p4: #4C6354; --focus: var(--forest);
+  --serif: "DM Serif Display", "Cormorant Garamond", Georgia, serif;
+  --sans: Inter, "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #12161d; --panel: #1a202a; --ink: #e8ecf3; --muted: #9aa5b8; --line: #2b3342;
-    --accent: #7a9bff; --accent-ink: #0c1220; --ok: #5fcf8f; --bad: #ff8a80;
-    --p1: #ff8a80; --p2: #ffb066; --p3: #7a9bff; --p4: #9aa5b8; --focus: #7a9bff;
+    --bg: #121A16; --panel: #19231E; --ink: #F4F1E8; --muted: #A9B8AA; --line: #2B3A32;
+    --accent: var(--sage); --accent-ink: #12201A; --ai-bg: #1F2B25; --ai-line: #4A5E50;
+    --ok: var(--sage); --bad: #F0907F; --bad-bg: #2A1D19; --warn: #E0B060; --warn-bg: #2B2518;
+    --p1: #F0907F; --p2: #E0B060; --p3: var(--sage); --p4: #A9B8AA; --focus: var(--sage);
   }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-header h1 { font-size: 17px; margin: 0; }
-.metrics { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-left: auto; }
-.metric { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); }
-.metric b { font-size: 17px; color: var(--ink); font-variant-numeric: tabular-nums; }
-main { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; padding: 16px; max-width: 1200px; margin: 0 auto; }
-@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-.list-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-.list-head h2 { font-size: 14px; margin: 0; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--forest); color: var(--cream); padding: 8px 12px; border-radius: 4px; z-index: 10; }
+.skip:focus { left: 8px; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: baseline; padding: 18px 24px 14px; border-bottom: 1px solid var(--line); }
+header h1 { font: 400 26px/1.1 var(--serif); letter-spacing: -.01em; margin: 0; color: var(--accent); }
+.note { font-size: 13px; color: var(--muted); }
+header h1 .note { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; margin-left: 10px; }
+.metrics { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-left: auto; }
+.metric { display: flex; flex-direction: column; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.metric b { font: 400 22px/1.2 var(--serif); letter-spacing: 0; text-transform: none; color: var(--ink); font-variant-numeric: tabular-nums; }
+main { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 20px; padding: 20px 24px; max-width: 1240px; margin: 0 auto; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 16px; } header { padding: 14px 16px 10px; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
+.list-head { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--line); }
+.list-head h2 { font: 400 18px var(--serif); margin: 0; }
 select, input, textarea, button { font: inherit; color: inherit; }
-select, input[type=text], input[type=password], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
-textarea { width: 100%; min-height: 200px; resize: vertical; }
+select, input[type=text], input[type=password], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; min-height: 36px; }
+textarea { width: 100%; min-height: 200px; resize: vertical; background: var(--panel); border-color: color-mix(in srgb, var(--forest) 35%, var(--line)); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 ul { list-style: none; margin: 0; padding: 0; }
-.item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 10px 12px; cursor: pointer; }
+.item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; padding: 11px 12px; cursor: pointer; }
 .item:last-child { border-bottom: 0; }
-.item[aria-current=true] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.item:hover { background: color-mix(in srgb, var(--sage) 14%, transparent); }
+.item[aria-current=true] { background: color-mix(in srgb, var(--sage) 26%, transparent); border-left-color: var(--forest); }
 .item .subj { font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item .sub { color: var(--muted); font-size: 13px; }
-.chip { display: inline-block; font-size: 12px; font-weight: 700; border: 1.5px solid currentColor; border-radius: 999px; padding: 0 8px; margin-right: 6px; }
+.chip { display: inline-block; font: 600 11px/18px var(--mono); border: 1.5px solid currentColor; border-radius: 3px; padding: 0 6px; margin-right: 6px; }
 .P1 { color: var(--p1); } .P2 { color: var(--p2); } .P3 { color: var(--p3); } .P4 { color: var(--p4); }
 #clusters { display: grid; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 #clusters:empty { display: none; }
-.banner { background: color-mix(in srgb, var(--p2) 14%, transparent); border: 1.5px solid var(--p2); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
-.link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; }
+.banner { background: var(--warn-bg); border: 1px solid var(--warn); border-left-width: 4px; border-radius: 3px; padding: 8px 10px; font-size: 13px; }
+.banner.hard { background: var(--bad-bg); border-color: var(--bad); }
+.banner strong { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .hist li { padding: 2px 0; }
-.why { display: inline-block; margin-right: 12px; font-size: 13px; }
-#insights { max-width: 1200px; margin: 16px auto; padding: 16px; overflow-x: auto; }
+.why { display: inline-block; margin-right: 14px; font-size: 13px; }
+#insights { width: calc(100% - 48px); max-width: 1240px; margin: 20px auto; padding: 20px; overflow-x: auto; }
+@media (max-width: 760px) { #insights { width: calc(100% - 32px); } }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-.detail { padding: 16px; display: grid; gap: 16px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.detail { padding: 20px; display: grid; gap: 18px; }
 .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
-.msg { white-space: pre-wrap; background: var(--bg); border-radius: 8px; padding: 10px 12px; margin: 0; }
+.empty.error { color: var(--bad); font-weight: 600; }
+h3 { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+.origin { display: inline-block; font: 600 10px/16px var(--mono); letter-spacing: .08em; border-radius: 2px; padding: 0 5px; margin-left: 8px; vertical-align: 1px; }
+.origin.ai { background: var(--sage); color: #12201A; }
+.origin.human { background: var(--forest); color: var(--cream); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .origin.human { background: var(--sage); color: #12201A; } }
+.ticket-subject { font: 400 22px/1.25 var(--serif); }
+.msg { white-space: pre-wrap; background: var(--bg); border-left: 3px solid var(--charcoal); border-radius: 0 3px 3px 0; padding: 10px 12px; margin: 8px 0; }
+.sec.ai { background: var(--ai-bg); border: 1px solid var(--ai-line); border-radius: 4px; padding: 14px; }
+.sec.ai select, .sec.ai textarea { background: var(--panel); }
+.sec.human { border: 1.5px solid var(--forest); border-radius: 4px; padding: 14px; display: grid; gap: 14px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sec.human { border-color: var(--sage); } }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.field label { display: block; font-size: 12px; color: var(--muted); }
-.field div, .field select { margin-top: 2px; }
+.field label { display: block; font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.field div, .field select { margin-top: 3px; }
 .rationale { color: var(--muted); font-size: 13px; margin-top: 8px; }
-.tag { font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-button.primary, button.danger { border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
-button.primary { background: var(--accent); color: var(--accent-ink); }
+.tag { display: inline-block; font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 1px 8px; margin: 0 6px 4px 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button.primary, button.danger { border-radius: 3px; padding: 9px 18px; min-height: 40px; font-weight: 600; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border: 1.5px solid var(--accent); }
+button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, black); }
 button.danger { background: transparent; color: var(--bad); border: 1.5px solid var(--bad); }
+button.danger:hover:not(:disabled) { background: var(--bad-bg); }
 button:disabled { opacity: .5; cursor: default; }
-.note { font-size: 13px; color: var(--muted); }
-#flash { max-width: 1200px; margin: 12px auto 0; padding: 8px 16px 0; font-size: 14px; font-weight: 600; }
+.status { border-radius: 3px; padding: 10px 12px; font-size: 14px; border: 1.5px solid var(--forest); }
+.status.approved { background: var(--forest); color: var(--cream); }
+.status.rejected { border-color: var(--bad); background: var(--bad-bg); color: var(--bad); }
+.status strong { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 2px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .status.approved { background: var(--ai-bg); color: var(--ink); border-color: var(--sage); } }
+#flash { max-width: 1240px; margin: 12px auto 0; padding: 8px 24px 0; font-size: 14px; font-weight: 600; }
 #flash:empty { display: none; }
 #flash.ok { color: var(--ok); } #flash.err { color: var(--bad); }
-dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); }
+dialog { border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
 </style>
 </head>
 <body>
+<a class="skip" href="#detail">Skip to ticket</a>
 <header>
   <h1>support-copilot <span class="note">review queue</span></h1>
   <button class="link" type="button" id="tab">Insights</button>
@@ -94,9 +126,9 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--p
       </label>
     </div>
     <div id="clusters"></div>
-    <ul id="list"></ul>
+    <ul id="list"><li class="empty">Loading tickets…</li></ul>
   </section>
-  <section class="panel" id="detail" aria-label="Ticket detail"></section>
+  <section class="panel" id="detail" aria-label="Ticket detail" tabindex="-1"></section>
 </main>
 <section class="panel" id="insights" hidden aria-label="Insights"></section>
 <dialog id="keydlg">
@@ -181,7 +213,11 @@ async function loadList() {
   renderClusters();
   const ul = $("list");
   ul.replaceChildren();
-  if (!tickets.length) ul.append(el("li", { class: "empty", text: "Nothing here." }));
+  if (!tickets.length) {
+    const f = $("filter").value;
+    ul.append(el("li", { class: "empty", text: clusterFilter ? "No pending tickets in this incident."
+      : f === "pending_review" ? "The queue is clear. Nothing is waiting for review." : `No ${f} tickets yet.` }));
+  }
   for (const t of tickets) {
     const tr = t.suggestion.triage;
     const b = el("button", { class: "item", type: "button", "aria-current": String(selected === t.id) },
@@ -222,14 +258,14 @@ function render() {
 
   // Promises in the reply (refunds, guarantees, amounts, deadlines): checked on the server so there is one rulebook.
   let flags = [], armed = false, timer = null;
-  const flagsBox = el("div", { class: "note" });
+  const flagsBox = el("div", { class: "note", role: "status" });
   flagsBox.hidden = true;
   const refreshFlags = async () => {
     try {
       const r = await api("/check-reply", { method: "POST", body: JSON.stringify({ text: reply.value }) });
       flags = r.warnings;
       flagsBox.hidden = !flags.length;
-      flagsBox.className = flags.some((f) => f.severity === "hard") ? "banner" : "note";
+      flagsBox.className = flags.some((f) => f.severity === "hard") ? "banner hard" : "note";
       flagsBox.textContent = flags.length ? `Check before sending: this reply ${r.explanation}.` : "";
     } catch { /* the check is a convenience: it must never block a review */ }
   };
@@ -290,10 +326,10 @@ function render() {
     : [el("span", { class: "note", text: "No matching article" })];
 
   d.append(el("div", { class: "detail" },
-    el("div", {}, el("h3", { text: `Ticket #${t.id}${t.system ? ` · ${t.system} ${t.external_id}` : ""}` }),
-      el("strong", { text: t.subject }), el("p", { class: "msg", text: t.body }),
+    el("div", { class: "sec ticket" }, el("h3", { text: `Ticket #${t.id}${t.system ? ` · ${t.system} ${t.external_id}` : ""}` }),
+      el("div", { class: "ticket-subject", text: t.subject }), el("p", { class: "msg", text: t.body }),
       el("div", { class: "note", text: `From ${t.customer}` })),
-    el("div", {}, el("h3", { text: "AI triage" }),
+    el("div", { class: "sec ai" }, el("h3", {}, "AI triage", el("span", { class: "origin ai", text: "AI SUGGESTION" })),
       el("div", { class: "grid" }, field("Priority", prio), field("Category", cat),
         field("Team", el("div", { text: tr.team })),
         field("Confidence", el("div", { text: `${pct(tr.confidence)} · ${tr.source}` })),
@@ -303,20 +339,23 @@ function render() {
       ...(s.notices || []).map((n) => el("div", { class: "rationale", text: n }))),
     ...(related.children.length ? [related] : []),
     ...(hist.children.length ? [hist] : []),
-    el("div", {}, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
-    el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply, flagsBox),
-    ...(pending ? [why] : []),
-    pending
-      ? el("div", { class: "actions" }, reviewer,
-          Object.assign(el("button", { class: "primary", type: "button", id: "approve", text: "Approve and send" }), {}),
-          el("button", { class: "danger", type: "button", id: "reject", text: "Reject" }),
-          el("span", { class: "note", text: "Nothing reaches the customer until you approve." }))
-      : el("div", { class: "note", text: rv
+    el("div", { class: "sec ai" }, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
+    el("div", { class: pending ? "sec ai" : "sec" },
+      el("h3", {}, pending ? "Draft reply (edit before approving)" : "Reply as sent", ...(pending ? [el("span", { class: "origin ai", text: "AI DRAFT" })] : [])),
+      reply, flagsBox),
+    ...(pending
+      ? [el("div", { class: "sec human" }, el("h3", {}, "Your decision", el("span", { class: "origin human", text: "HUMAN" })), why,
+          el("div", { class: "actions" }, reviewer,
+            el("button", { class: "primary", type: "button", id: "approve", text: "Approve and send" }),
+            el("button", { class: "danger", type: "button", id: "reject", text: "Reject" }),
+            el("span", { class: "note", text: "Nothing reaches the customer until you approve." })))]
+      : []),
+    ...(pending ? [] : [el("div", { class: `status ${t.status}` }, el("strong", { text: t.status === "approved" ? "Approved by a person" : "Rejected by a person" }), document.createTextNode(rv
           ? `${t.status[0].toUpperCase()}${t.status.slice(1)} by ${rv.reviewer} on ${rv.created_at.slice(0, 10)}. `
             + `AI suggested ${tr.priority} / ${tr.category}${rv.final_reply === s.draft_reply ? "" : "; reply was edited"}.`
             + (rv.reasons && rv.reasons.length ? ` Reasons: ${rv.reasons.map((x) => x.replace("_", " ")).join(", ")}.` : "")
             + (rv.note ? ` Note: ${rv.note}` : "")
-          : `This ticket was ${t.status}.` })));
+          : `This ticket was ${t.status}.`))])));
 
   if (pending) {
     const send = async (url, action, done) => {
@@ -386,7 +425,8 @@ $("tab").addEventListener("click", async () => {
 });
 
 $("filter").addEventListener("change", () => { selected = null; clusterFilter = null; say(""); loadList(); });
-Promise.all([loadMetrics(), loadList()]).catch((e) => { $("detail").replaceChildren(el("div", { class: "empty", text: e.message })); });
+Promise.all([loadMetrics(), loadList()]).catch((e) => { $("detail").replaceChildren(el("div", { class: "empty error", role: "alert", text: e.message }));
+  $("list").replaceChildren(el("li", { class: "empty", text: "Could not load tickets." })); });
 </script>
 </body>
 </html>
