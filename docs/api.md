@@ -15,13 +15,19 @@ These are the routes of `create_router(copilot)` (see the [embedding guide](embe
 | POST | `/clusters/{id}/review` | One decision for every pending ticket of a possible incident (409 for other groups) |
 | POST | `/check-reply` | Promises (refunds, guarantees, amounts, deadlines) in a reply about to be sent |
 | POST | `/tickets/{id}/review` | Human approves or rejects; can correct priority, category and reply |
-| POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`) |
+| POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`): a new ticket is triaged and queued; an update that adds `ai_approve` or `ai_reject` to a ticket already queued is the person's decision (see below) |
 | GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`) |
 | GET | `/metrics` | Human vs AI agreement and reply edit rate |
 | GET | `/metrics/breakdown` | Per category: clean rate, its lower bound, rejections, reasons, automation candidates |
 | GET | `/health` | Liveness, whether the LLM is enabled, which ticket systems are configured |
 
 Set `API_KEY` and send it as `X-API-Key` to protect everything except `/health` and the webhooks (which use each system's own signature). If `API_KEY` is not set the API is open, which is only fine on a local machine.
+
+## What the webhook does
+
+- **Signature first.** With the system's webhook secret set, a request without a valid signature gets `401`. A body over 1 MB gets `413` without being read.
+- **A new ticket** is triaged and queued (`201`, with the triage and the draft). A re-sent webhook is recognised and changes nothing. A long ticket is cut to its first 10,000 characters and a short or empty field is filled in, so a helpdesk is never told to retry something that can be handled (`422` only for a payload that is not a ticket at all).
+- **An update to a ticket already queued** is read for the decision tags. `ai_approve` sends the drafted reply once and `ai_reject` sends nothing; both are recorded under the agent named in the payload. Both tags at once, any other update, a repeat, and a decision from someone not in `allowed_reviewers` change nothing, and the response says why (`ignored`). For a connected system a decision also needs the webhook secret to be set. [Details](integrations.md#deciding-from-inside-the-helpdesk)
 
 ## Configuration
 

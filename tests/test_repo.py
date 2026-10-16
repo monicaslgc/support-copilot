@@ -75,3 +75,8 @@ def test_every_third_party_import_of_the_core_is_a_declared_dependency():
             imported |= {n.split(".")[0] for n in names}
     third_party = imported - set(sys.stdlib_module_names) - {"support_copilot"} - optional
     assert third_party <= declared, f"undeclared: {third_party - declared}"
+
+
+def test_ci_also_checks_the_built_wheel_in_a_clean_environment():
+    ci = (ROOT / ".github/workflows/tests.yml").read_text()
+    assert "python -m build --wheel" in ci and "library_usage.py" in ci and "3.13" in ci

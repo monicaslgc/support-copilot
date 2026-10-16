@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -18,3 +18,22 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: pytest -q
+
+  # What a user gets from `pip install`: the built wheel, in a clean environment, with only the declared
+  # dependencies. This is the check that would have caught a missing dependency or a missing data file.
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install build && python -m build --wheel
+      - name: Install the wheel in a clean environment and use it
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install "$(ls dist/*.whl)[fastapi]"
+          cd "$(mktemp -d)"
+          /tmp/clean/bin/python -I -c "from support_copilot.main import app; print('server imports')"
+          cp "$GITHUB_WORKSPACE/examples/library_usage.py" .
+          /tmp/clean/bin/python library_usage.py | tail -1

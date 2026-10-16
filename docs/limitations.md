@@ -17,10 +17,13 @@ What is not verified, what is a baseline, and what comes next. Back to the [READ
 
 ## Next steps
 
-- Run the Zammad and Zendesk adapters against real instances and fix whatever differs from the documentation
+- Run the Zammad and Zendesk adapters against real instances and fix whatever differs from the documentation: the webhook payloads that carry tags and the acting agent, and the type of the article that carries a Zammad reply (so the customer is emailed)
+- Let an agent edit the reply before approving from the helpdesk, not only approve or reject it as drafted
+- Check the age of a webhook's timestamp, and retry failed ticket-system calls
 - Run the Claude path against the live API and compare the model with the rules on a labelled evaluation set
 - Feed the correction reasons back into the prompts and into that evaluation set
 - Embeddings (for example pgvector) and PostgreSQL instead of TF-IDF and SQLite
 - A background queue for model calls and ticket-system pushes, so a bulk review of a big incident is not one long request
 - Retry of failed `/outbox` entries
+- A release on PyPI (today it installs from GitHub)
 - A Dockerfile and compose file (not written yet because they could not be built and checked where this was developed)

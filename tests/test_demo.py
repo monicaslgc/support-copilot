@@ -91,6 +91,22 @@ def test_the_examples_readme_flow_works_end_to_end():
     assert any(o["kind"] == "public_reply" for o in c.get("/outbox").json())
 
 
+def test_the_decision_examples_approve_the_tickets_the_creation_examples_made():
+    c = TestClient(main.app)
+    for system in ("zammad", "zendesk"):
+        made = c.post(f"/webhooks/{system}", content=(ROOT / "examples" / f"{system}_webhook.json").read_bytes(),
+                      headers={"content-type": "application/json"}).json()
+        body = (ROOT / "examples" / f"{system}_decision.json").read_bytes()
+        done = c.post(f"/webhooks/{system}", content=body, headers={"content-type": "application/json"}).json()
+        assert done["decided_in"] == system and done["id"] == made["id"] and done["sync"] == "dry_run"
+        review = c.get(f"/tickets/{made['id']}").json()["review"]
+        assert (review["action"], review["reviewer"]) == ("approved", "ana@example.com")
+        again = c.post(f"/webhooks/{system}", content=body, headers={"content-type": "application/json"}).json()
+        assert again["ignored"] == "already decided"
+    public = [o for o in c.get("/outbox").json() if o["kind"] == "public_reply"]
+    assert {o["system"] for o in public} == {"zammad", "zendesk"} and len(public) == 2   # one reply each, no more
+
+
 @pytest.mark.skipif(shutil.which("openssl") is None, reason="the README recipe uses openssl")
 def test_the_signing_recipes_in_the_examples_readme_produce_valid_signatures(monkeypatch):
     """Run the openssl commands exactly as the README gives them and check the server accepts the result."""

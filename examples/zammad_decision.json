@@ -1,0 +1,5 @@
+{
+  "ticket": {"id": 1042, "title": "Cannot export the monthly report", "customer": "rui@example.com",
+             "tags": ["ai_triaged", "ai_cat_bug", "ai_approve"], "updated_by": {"email": "ana@example.com"}},
+  "article": {"body": "Hi, the export to CSV fails every time I try it. This is the third time this week.", "from": "Rui Costa <rui@example.com>"}
+}

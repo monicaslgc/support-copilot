@@ -45,6 +45,17 @@ curl -s localhost:8000/tickets/1/review -H 'content-type: application/json' \
 
 `/outbox` now also has a `public_reply`: that is the first and only thing the customer would see.
 
+## Approve by tagging the ticket
+
+In your helpdesk the agent adds the tag `ai_approve` (or `ai_reject`) to the ticket and the helpdesk calls the webhook again, now with the ticket's tags and the person who changed it. [`zendesk_decision.json`](zendesk_decision.json) and [`zammad_decision.json`](zammad_decision.json) are those updates for the two tickets above (send the creation webhooks first):
+
+```bash
+curl -s localhost:8000/webhooks/zendesk -H 'content-type: application/json' \
+     --data-binary @examples/zendesk_decision.json | python -m json.tool
+```
+
+The answer says `"decided_in": "zendesk"`, the review page shows the ticket as approved by `ana@example.com`, and `/outbox` has the `public_reply`. Send the same file again and nothing more is sent (`"ignored": "already decided"`). With `ai_reject` instead, the customer gets nothing. Details, and why a connected system needs its webhook secret for this, are in the [integration guide](../docs/integrations.md#deciding-from-inside-the-helpdesk). These payload shapes are checked against fakes only.
+
 ## Signed webhooks
 
 With a secret set, a webhook without a valid signature is refused. Start the server with `ZAMMAD_WEBHOOK_SECRET=s3cret` and `ZENDESK_WEBHOOK_SECRET=s3cret`, then:
