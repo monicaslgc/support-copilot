@@ -26,6 +26,7 @@ class WebhookError(ValueError):
 
 class TicketSystem(ABC):
     name: str
+    secret_env: str = ""  # environment variable holding this system's webhook secret
     transport: httpx.BaseTransport | None = None  # injectable in tests
 
     # --- connection (used by the shared HTTP executor) ---

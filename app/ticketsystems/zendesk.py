@@ -32,6 +32,7 @@ class _Payload(BaseModel):
 
 class ZendeskSystem(TicketSystem):
     name = "zendesk"
+    secret_env = "ZENDESK_WEBHOOK_SECRET"
 
     def __init__(self, subdomain=None, email=None, api_token=None, transport=None):
         self.subdomain, self.email, self.api_token = subdomain, email, api_token
@@ -53,7 +54,7 @@ class ZendeskSystem(TicketSystem):
         return (f"{self.email}/token", self.api_token)
 
     def verify_webhook(self, headers: Mapping[str, str], raw: bytes) -> bool:
-        secret = os.getenv("ZENDESK_WEBHOOK_SECRET")
+        secret = os.getenv(self.secret_env)
         if not secret:
             return True
         return verify_signature(secret, headers.get("X-Zendesk-Webhook-Signature-Timestamp", ""), raw,

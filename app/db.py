@@ -16,6 +16,7 @@ def connect(path: str | None = None) -> sqlite3.Connection:
             suggestion TEXT NOT NULL,           -- JSON: triage + articles + draft
             status TEXT NOT NULL DEFAULT 'pending_review',
             system TEXT, external_id TEXT,      -- set when the ticket came from a ticket system
+            category TEXT, priority TEXT,       -- the AI's triage, as columns so the queue can be sorted in SQL
             topic TEXT,                         -- best matching KB article id
             cluster_id INTEGER,                 -- tickets about the same issue share this (parent ticket id)
             duplicate_of INTEGER,               -- same customer, same category, within the window
@@ -48,15 +49,25 @@ def connect(path: str | None = None) -> sqlite3.Connection:
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
     """Upgrade a database created by an older version (CREATE TABLE IF NOT EXISTS does not add columns)."""
-    wanted = {"tickets": {"topic": "TEXT", "cluster_id": "INTEGER", "duplicate_of": "INTEGER"},
+    wanted = {"tickets": {"topic": "TEXT", "cluster_id": "INTEGER", "duplicate_of": "INTEGER",
+                          "category": "TEXT", "priority": "TEXT"},
               "reviews": {"ai_reply": "TEXT", "reasons": "TEXT", "note": "TEXT"}}
     for table, cols in wanted.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols.items():
             if name not in have:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_tickets_cluster ON tickets(cluster_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS ix_tickets_created ON tickets(created_at)")
+    for row in conn.execute("SELECT id, suggestion FROM tickets WHERE category IS NULL").fetchall():  # backfill
+        try:
+            triage = json.loads(row["suggestion"]).get("triage", {})
+        except ValueError:
+            triage = {}
+        conn.execute("UPDATE tickets SET category = ?, priority = ? WHERE id = ?",
+                     (triage.get("category", "other"), triage.get("priority", "P3"), row["id"]))
+    for name, cols in (("cluster", "cluster_id"), ("created", "created_at"), ("topic", "topic, category, created_at"),
+                       ("customer", "lower(customer), category, created_at"),
+                       ("queue", "status, priority, created_at, id")):
+        conn.execute(f"CREATE INDEX IF NOT EXISTS ix_tickets_{name} ON tickets({cols})")
     conn.commit()
 
 

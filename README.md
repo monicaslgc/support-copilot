@@ -35,6 +35,8 @@ ticket -> classify (LLM or rules) -> RAG over KB -> draft reply -> review queue 
 
 ## Run it
 
+Needs Python 3.11 or newer.
+
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --reload     # review UI at http://127.0.0.1:8000/  ·  API docs at /docs
@@ -81,7 +83,7 @@ When an outage starts, the queue fills with near-identical tickets. Reviewing th
 
 ![Possible incident](docs/incident-spike.png)
 
-Limits: matching is lexical (same words, same article), not semantic. Linking can chain: A joins B and B joins C even if A and C are far apart in time. Bulk reviews count each ticket in `/metrics`, so a large incident weighs heavily on the agreement numbers. Nothing raises a ticket's priority automatically. It only warns.
+Limits: matching is lexical (same words, same article), not semantic. Linking can chain: A joins B and B joins C even if A and C are far apart in time. Same-topic and same-customer matches look at the whole window; near-identical text only among the latest 200 tickets. Bulk reviews count each ticket in `/metrics`, so a large incident weighs heavily on the agreement numbers. Nothing raises a ticket's priority automatically. It only warns.
 
 ## Sentiment, language and customer context
 
@@ -178,7 +180,7 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 
 ## Tests
 
-261 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
+273 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
@@ -186,6 +188,14 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 - **Security and limits:** API key on every protected route, webhook signatures, oversized webhooks, review actions that are not approved/rejected.
 
 I checked that the tests catch real bugs by breaking the code on purpose, 20+ ways (public/internal swapped, tags overwritten, wrong priority map, wrong signature algorithm, missing idempotency, ids colliding across systems, non-atomic review, unlocked database reads, reading `content[0]` instead of the text block, the old `max_tokens`, a 10 minute timeout, unhandled refusals, no API key check, no size limit): each break made at least one test fail.
+
+## Performance
+
+Measured in-process with 2000 tickets in the same hour (no network, one SQLite connection, rules mode): saving a ticket takes about 6.5 ms whether the queue holds 100 or 2000 tickets, and listing the queue about 17 ms. The first version scanned every recent ticket to link related ones and went from 6 ms to 34 ms over the same run, while holding the lock that serialises all database access. Now the linking rules use indexes (one row by topic, one by customer) and only compare near-identical text among the latest 200 tickets, and the queue is sorted and limited in SQL. With a real model the call to it dominates, not the database.
+
+A reasonable ceiling for this design is one instance and a few thousand tickets an hour. Beyond that, move to PostgreSQL, run the model calls and ticket-system pushes in a background queue, and make bulk reviews asynchronous: a bulk decision on a big incident currently pushes to the ticket system one ticket at a time inside one request.
+
+At startup the app logs a warning when a ticket system is connected but its webhook secret, or `API_KEY`, is not set, since that leaves the endpoints open.
 
 ## Known limitations
 

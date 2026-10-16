@@ -26,6 +26,7 @@ def verify_signature(secret: str, body: bytes, signature: str) -> bool:
 
 class ZammadSystem(TicketSystem):
     name = "zammad"
+    secret_env = "ZAMMAD_WEBHOOK_SECRET"
 
     def __init__(self, url=None, token=None, transport=None):
         self.url, self.token = (url or "").rstrip("/") or None, token
@@ -47,7 +48,7 @@ class ZammadSystem(TicketSystem):
         return {"Authorization": f"Token token={self.token}"}
 
     def verify_webhook(self, headers: Mapping[str, str], raw: bytes) -> bool:
-        secret = os.getenv("ZAMMAD_WEBHOOK_SECRET")
+        secret = os.getenv(self.secret_env)
         if not secret:
             return True
         return verify_signature(secret, raw, headers.get("X-Hub-Signature", ""))

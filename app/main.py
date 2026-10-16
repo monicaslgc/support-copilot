@@ -33,6 +33,20 @@ _write_lock = threading.RLock()
 MAX_WEBHOOK_BYTES = 1_000_000
 
 
+def security_warnings() -> list[str]:
+    """Settings that leave a live deployment open. Logged at startup; only matters once a ticket system is
+    connected, because that is when real customer data starts to flow."""
+    out = [f"{name} is connected but {s.secret_env} is not set: anyone who can reach this server can post "
+           f"tickets to its webhook" for name, s in systems.items() if s.configured and not os.getenv(s.secret_env)]
+    if any(s.configured for s in systems.values()) and not os.getenv("API_KEY"):
+        out.append("API_KEY is not set: the review API, which returns customer messages, is open")
+    return out
+
+
+for _warning in security_warnings():
+    log.warning(_warning)
+
+
 def _all(sql: str, params: tuple = ()) -> list:
     with _write_lock:
         return conn.execute(sql, params).fetchall()
@@ -157,17 +171,34 @@ def _suggest(t: TicketIn) -> Suggestion:
     )
 
 
-def _recent_items(new_at: datetime) -> list[clusters.Item]:
-    """Tickets created within the clustering window before `new_at`. Caller holds the lock."""
-    cutoff = (new_at - clusters.window()).isoformat(timespec="seconds")
+SIMILARITY_SCAN = 200  # how many of the latest tickets are compared by text; the other rules use indexes
+
+
+def _candidates(new: clusters.Item) -> list[clusters.Item]:
+    """The few tickets the linking rules could match, found with indexes instead of scanning the whole window
+    (which made every insert slower as the queue grew, while holding the lock). Caller holds the lock.
+
+    The rules only need the *earliest* related ticket, so same-topic and same-customer ask for one row each;
+    near-identical text is only searched among the most recent tickets.
+    """
+    cols = "id, cluster_id, customer, topic, category, subject, body, created_at"
+    cutoff = (new.created_at - clusters.window()).isoformat(timespec="seconds")
+    queries = []
+    if new.topic is not None:
+        queries.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? AND topic = ? AND category = ?"
+                        " ORDER BY created_at, id LIMIT 1", (cutoff, new.topic, new.category)))
+    if new.customer.strip() and new.customer.strip().lower() != clusters.UNKNOWN:
+        queries.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? AND lower(customer) = lower(?)"
+                        " AND category = ? ORDER BY created_at, id LIMIT 1",
+                        (cutoff, new.customer.strip(), new.category)))
+    queries.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? ORDER BY id DESC LIMIT ?",
+                    (cutoff, SIMILARITY_SCAN)))
+    rows = {r["id"]: r for sql, params in queries for r in conn.execute(sql, params)}
     return [
-        clusters.Item(
-            id=r["id"], cluster_id=r["cluster_id"], customer=r["customer"], topic=r["topic"],
-            category=json.loads(r["suggestion"])["triage"]["category"],
-            tokens=frozenset(tokens(f"{r['subject']} {r['body']}")), created_at=datetime.fromisoformat(r["created_at"]))
-        for r in conn.execute(
-            "SELECT id, cluster_id, customer, topic, subject, body, created_at, suggestion"
-            " FROM tickets WHERE created_at >= ?", (cutoff,))
+        clusters.Item(id=r["id"], cluster_id=r["cluster_id"], customer=r["customer"], topic=r["topic"],
+                      category=r["category"], tokens=frozenset(tokens(f"{r['subject']} {r['body']}")),
+                      created_at=datetime.fromisoformat(r["created_at"]))
+        for r in rows.values()
     ]
 
 
@@ -181,13 +212,15 @@ def _store(t: TicketIn, s: Suggestion, system: str | None = None, external_id: s
         new = clusters.Item(id=0, customer=t.customer, category=s.triage.category.value, topic=topic,
                             tokens=frozenset(tokens(f"{t.subject} {t.body}")),
                             created_at=datetime.fromisoformat(created))
-        others = _recent_items(new.created_at)
+        others = _candidates(new)
         parent = clusters.find_cluster(new, others)
         duplicate = clusters.find_duplicate(new, others)
         cur = conn.execute(
-            "INSERT OR IGNORE INTO tickets (created_at, subject, body, customer, suggestion, system, external_id,"
-            " topic, cluster_id, duplicate_of) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (created, t.subject, t.body, t.customer, s.model_dump_json(), system, external_id, topic,
+            "INSERT INTO tickets (created_at, subject, body, customer, suggestion, system, external_id,"
+            " category, priority, topic, cluster_id, duplicate_of) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT (system, external_id) DO NOTHING",  # not OR IGNORE: that would also hide NOT NULL errors
+            (created, t.subject, t.body, t.customer, s.model_dump_json(), system, external_id,
+             s.triage.category.value, s.triage.priority.value, topic,
              (parent.cluster_id or parent.id) if parent else None, duplicate.id if duplicate else None),
         )
         if cur.rowcount and parent and parent.cluster_id is None:
@@ -315,11 +348,9 @@ async def ticket_system_webhook(system_name: str, request: Request):
 @api.get("/tickets")
 def list_tickets(status: Status | None = None, limit: int = Query(100, ge=1, le=500)):
     """Review queue, most urgent first."""
-    q = "SELECT * FROM tickets" + (" WHERE status = ?" if status else "")
-    rows = _all(q, (status.value,) if status else ())
-    tickets = [row_to_ticket(r) for r in rows]
-    tickets.sort(key=lambda t: (t["suggestion"]["triage"]["priority"], t["created_at"]))
-    return _attach_history(_attach_clusters(_attach_reviews(tickets[:limit])))
+    where, params = ("WHERE status = ? ", (status.value,)) if status else ("", ())
+    rows = _all(f"SELECT * FROM tickets {where}ORDER BY priority, created_at, id LIMIT ?", (*params, limit))
+    return _attach_history(_attach_clusters(_attach_reviews([row_to_ticket(r) for r in rows])))
 
 
 @api.get("/tickets/{ticket_id}")
