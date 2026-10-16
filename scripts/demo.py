@@ -174,7 +174,8 @@ def outage(r: Run) -> None:
 
     r.step("One decision answers every pending ticket in it")
     res = r.c.post(f"/clusters/{cluster['id']}/review", json={
-        "action": "approved", "reviewer": "demo", "edited_reply": "We know about the outage and are working on it."})
+        "action": "approved", "reviewer": "demo", "edited_reply": "We know about the outage and are working on it.",
+        "ticket_ids": cluster["pending_ids"]})
     r.check(res.status_code == 200 and set(mine) <= set(res.json()["reviewed"]), "all four were reviewed together")
     for i in range(4):
         replies = [n for n in r.written_to("zammad", base + i) if not n["internal"]]
@@ -191,7 +192,8 @@ def outage(r: Run) -> None:
     r.check(tb["duplicate_of"] == a["id"], "the second ticket is flagged as a possible duplicate of the first")
     r.check(tb["cluster"]["customers"] == 1 and tb["cluster"]["kind"] == "related",
             "the two tickets are linked, but one customer is not an incident")
-    refused = r.c.post(f"/clusters/{tb['cluster']['id']}/review", json={"action": "approved", "reviewer": "demo"})
+    refused = r.c.post(f"/clusters/{tb['cluster']['id']}/review", json={"action": "approved", "reviewer": "demo",
+                                                                           "ticket_ids": [a["id"], b["id"]]})
     r.check(refused.status_code == 409, "so a bulk answer is refused: it is only for incidents")
 
 

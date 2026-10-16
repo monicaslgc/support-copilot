@@ -67,7 +67,8 @@ def test_a_bulk_decision_records_the_reasons_on_every_ticket():
                                   ("Ana", "Rui", "Sam"), strict=True)]
     cl = c.get("/clusters").json()[0]
     c.post(f"/clusters/{cl['id']}/review", json={"action": "rejected", "reviewer": "m",
-                                                 "reasons": ["duplicate"], "note": "known incident"})
+                                                 "reasons": ["duplicate"], "note": "known incident",
+                                                 "ticket_ids": ids})
     for tid in ids:
         r = c.get(f"/tickets/{tid}").json()["review"]
         assert r["reasons"] == ["duplicate"] and r["note"] == "known incident"

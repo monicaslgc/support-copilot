@@ -247,3 +247,55 @@ def test_tickets_stored_before_this_feature_still_load():
     main.copilot.conn.commit()
     t = TestClient(main.app).get("/tickets").json()[0]
     assert t["suggestion"]["draft_reply"] == "Hi" and "warnings" not in t["suggestion"]
+
+
+# ---------------- found by an independent review: the safeguards had holes and a denial of service
+@pytest.mark.parametrize("text", [
+    "we’ll refund you", "You’ll be refunded", "I’ve refunded the charge",          # curly apostrophes
+    "We will issue a refund today.", "We have processed your refund.", "Your refund is on its way.",
+    "We can offer a refund.", "We'll send you a refund.", "You will get your money back.",
+    "It is free.", "it's free", "We granted you a partial refund.",
+])
+def test_promises_are_caught_however_they_are_worded_and_punctuated(text):
+    assert hard_commitments(find_commitments(text)), text
+
+
+@pytest.mark.parametrize("text", [
+    "Please read the refund policy in our help article.", "A specialist will look into your invoice.",
+    "Thanks for reaching out about the charge.",
+])
+def test_plain_replies_are_not_flagged_by_the_broader_phrases(text):
+    assert not hard_commitments(find_commitments(text)), text
+
+
+@pytest.mark.parametrize("text,masked", [
+    ("My card 4111 1111 1111 1111 12/26 was charged", "My card [CARD] 12/26 was charged"),     # expiry next to it
+    ("On 2024 4111 1111 1111 1111 paid", "On 2024 [CARD] paid"),                                # a year before it
+    ("card 4111-1111-1111-1111 cvv 123", "card [CARD] cvv 123"),
+    ("password is: hunter2", "password is: [SECRET]"),
+    ('my password is "correct horse battery"', "my password is [SECRET]"),
+    ("password: 'abc def'", "password: [SECRET]"),
+    ("write to jose.o'brien@example.com", "write to [EMAIL]"),
+    ("IBAN DE89-3704-0044-0532-0130-00", "IBAN [IBAN]"),
+    ("iban de89 3704 0044 0532 0130 00", "iban [IBAN]"),
+])
+def test_private_details_are_masked_when_the_text_around_them_is_awkward(text, masked):
+    assert redact(text)[0] == masked
+
+
+def test_a_long_digit_string_that_is_no_card_is_left_alone():
+    for text in ("order 1234 5678 9012 3456 shipped", "tracking 9400 1000 0000 0000 0000 00",
+                 "ids 12 34 56 78 90 12 34", "0000 0000 0000 0000"):
+        assert redact(text)[0] == text
+
+
+@pytest.mark.parametrize("adversarial", [
+    "1." * 50_000, "word" * 25_000 + "@", "a" * 100_000 + "g", "a." * 50_000, "x+" * 50_000,
+    " ".join(["4111"] * 25_000), "1 " * 50_000, "9" * 100_000, "A1 " * 33_000, "password " * 12_000,
+], ids=lambda text: f"{text[:6]!r}x{len(text)}")   # short ids: pytest is slow at naming a 100,000-character case
+def test_no_ticket_text_can_hold_the_server_for_more_than_a_moment(adversarial):
+    import time
+    start = time.perf_counter()
+    redact(adversarial)
+    find_commitments(adversarial)
+    assert time.perf_counter() - start < 3, "a pattern backtracks on this input"

@@ -21,7 +21,8 @@ PRIORITY_ID = {Priority.P1: 3, Priority.P2: 3, Priority.P3: 2, Priority.P4: 1}
 def verify_signature(secret: str, body: bytes, signature: str) -> bool:
     """Zammad sends `X-Hub-Signature: sha1=<hex HMAC-SHA1 of the body>`."""
     expected = "sha1=" + hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()
-    return hmac.compare_digest(expected, signature or "")
+    # as bytes: compare_digest raises on text that is not ASCII, and a header is anything a caller sends
+    return hmac.compare_digest(expected.encode(), (signature or "").encode("utf-8", "replace"))
 
 
 class ZammadSystem(TicketSystem):
@@ -57,16 +58,28 @@ class ZammadSystem(TicketSystem):
         """Parses Zammad's default webhook payload: {"ticket": {...}, "article": {...}}."""
         try:
             d = json.loads(raw)
-            ticket, article = d["ticket"], d.get("article") or {}
-            ext_id, subject = ticket["id"], ticket["title"]
-        except (ValueError, KeyError, TypeError) as e:
-            raise WebhookError(f"not a Zammad ticket payload: {e!r}") from e
-        body = article.get("body") or ticket.get("title")
-        who = article.get("from") or ticket.get("customer") or "unknown"
+        except ValueError as e:
+            raise WebhookError(f"not JSON: {e}") from e
+        ticket = d.get("ticket") if isinstance(d, dict) else None
+        article = d.get("article") if isinstance(d, dict) else None
+        article = {} if article is None else article
+        if not isinstance(ticket, dict) or not isinstance(article, dict):
+            raise WebhookError("not a Zammad ticket payload: expected {\"ticket\": {...}, \"article\": {...}}")
+        ext_id, title = ticket.get("id"), ticket.get("title")
+        if isinstance(ext_id, bool) or not isinstance(ext_id, (int, str)) or not str(ext_id).strip():
+            raise WebhookError("not a Zammad ticket payload: ticket.id is missing")
+        if not isinstance(title, str) or not title.strip():
+            raise WebhookError("not a Zammad ticket payload: ticket.title is missing")
+
+        def text(value, fallback):
+            return value if isinstance(value, str) and value.strip() else fallback
+
+        body = text(article.get("body"), title)
+        who = text(article.get("from"), text(ticket.get("customer"), "unknown"))
         by = ticket.get("updated_by")
         actor = (by.get("email") or by.get("login")) if isinstance(by, dict) else by
-        return InboundTicket(str(ext_id), str(subject), str(body), str(who), split_tags(ticket.get("tags")),
-                             str(actor) if actor else None)
+        return InboundTicket(str(ext_id), title, body, who, split_tags(ticket.get("tags")),
+                             actor if isinstance(actor, str) and actor.strip() else None)
 
     probe_path = "/api/v1/users/me"
 

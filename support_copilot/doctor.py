@@ -11,6 +11,7 @@ settings, run the same checks on your object: `run_checks(my_copilot, live=True)
 """
 import argparse
 import os
+import sqlite3
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,7 +27,20 @@ class Check:
     detail: str
 
 
-def run_checks(cp: Copilot, live: bool = False, model: bool = False, planned_db: str | None = None) -> list[Check]:
+def _count_tickets_read_only(path: str) -> int | None:
+    """The tickets in an existing database file, without opening it for writing or migrating it."""
+    try:
+        conn = sqlite3.connect(f"{Path(path).resolve().as_uri()}?mode=ro", uri=True)
+        try:
+            return conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return None
+
+
+def run_checks(cp: Copilot, live: bool = False, model: bool = False, planned_db: str | None = None,
+               existing_db: str | None = None) -> list[Check]:
     out: list[Check] = []
     add = lambda status, name, detail: out.append(Check(status, name, detail))  # noqa: E731
 
@@ -35,7 +49,14 @@ def run_checks(cp: Copilot, live: bool = False, model: bool = False, planned_db:
 
     path = (cp.conn.execute("PRAGMA database_list").fetchone()["file"] or "")
     count = cp.fetch_one("SELECT COUNT(*) AS n FROM tickets")["n"]
-    if path:
+    if existing_db:  # looked at read-only: a check must not change the file it is checking
+        found = _count_tickets_read_only(existing_db)
+        if found is None:
+            add("fail", "database", f"{existing_db} exists but cannot be read as a support-copilot database")
+        else:
+            add("ok", "database", f"{Path(existing_db).resolve()}: {found} tickets. Back this file up: it holds "
+                                  "ticket text and every decision")
+    elif path:
         add("ok", "database", f"{path}: {count} tickets. Back this file up: it holds ticket text and every decision")
     elif planned_db:  # the file does not exist yet: the server creates it, if it can
         where = Path(planned_db).resolve()
@@ -129,13 +150,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--live", action="store_true", help="call each connected helpdesk once, read-only")
     ap.add_argument("--model", action="store_true", help="make one small call to Claude")
     args = ap.parse_args(argv)
-    path = os.getenv("TRIAGE_DB", "triage.db")
+    path = os.environ.get("TRIAGE_DB") or "triage.db"
+    exists = Path(path).is_file()
     try:
-        cp = Copilot.from_env(db=path if Path(path).exists() else ":memory:")  # do not create an empty file to look
+        cp = Copilot.from_env(db=":memory:")  # never open the real file for writing just to look at it
     except ValueError as e:  # a setting that cannot work: say which, instead of a traceback
         print(f"[FAIL] configuration  {e}")
         return 1
-    checks = run_checks(cp, live=args.live, model=args.model, planned_db=None if Path(path).exists() else path)
+    checks = run_checks(cp, live=args.live, model=args.model, planned_db=None if exists else path,
+                        existing_db=path if exists else None)
     print(render(checks))
     return 1 if any(c.status == "fail" for c in checks) else 0
 

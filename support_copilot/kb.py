@@ -35,7 +35,7 @@ class KnowledgeBase:
     def __init__(self, directory: Path = KB_DIR):
         self.directory = Path(directory)
         self.docs: list[dict[str, Any]] = []
-        for path in sorted(directory.glob("*.md")):
+        for path in sorted(self.directory.glob("*.md")):
             text = path.read_text(encoding="utf-8")
             title = text.splitlines()[0].lstrip("# ").strip() if text else path.stem
             self.docs.append({"id": path.stem, "title": title, "text": text, "tf": Counter(_tokens(text))})

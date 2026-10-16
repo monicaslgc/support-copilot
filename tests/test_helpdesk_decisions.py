@@ -235,3 +235,52 @@ def test_a_system_without_credentials_never_needs_the_secret_because_nothing_is_
     made = c.post("/webhooks/zendesk", json=hook).json()
     again = c.post("/webhooks/zendesk", json={**hook, "tags": "ai_approve", "agent": "ana@acme.com"}).json()
     assert again["decided_in"] == "zendesk" and review_row(made["id"])["action"] == "approved"
+
+
+def test_a_pre_tagged_ticket_is_not_approved_by_the_update_our_own_note_causes(env):
+    fz = env.fake
+    fz.seed(100, tags=["ai_approve"])
+    payload = fz.payload(100, SUBJECT, BODY, "Sam", "ana@acme.com", True)
+    local_id = env.c.post(f"/webhooks/{env.name}", json=payload).json()["id"]
+    echo = update(env, agent="ana@acme.com")                         # the helpdesk reports our note, tag still there
+    assert "already carried a decision tag" in echo.json()["ignored"]
+    assert fz.public(100) == [] and review_row(local_id) is None
+    update(env, add=[])                                              # still tagged: still refused
+    assert fz.public(100) == []
+
+
+def test_removing_and_re_adding_the_tag_arms_a_pre_tagged_ticket(env):
+    fz = env.fake
+    fz.seed(100, tags=["ai_approve"])
+    payload = fz.payload(100, SUBJECT, BODY, "Sam", "ana@acme.com", True)
+    local_id = env.c.post(f"/webhooks/{env.name}", json=payload).json()["id"]
+    fz.tickets[100]["tags"].discard("ai_approve")
+    assert update(env).status_code == 201                            # an update without the tag arms the ticket
+    assert update(env, add=["ai_approve"]).status_code == 201
+    assert len(fz.public(100)) == 1 and review_row(local_id)["action"] == "approved"
+
+
+def test_a_draft_with_a_hard_promise_cannot_be_approved_by_tag(env, monkeypatch):
+    local_id = arrive(env)
+    main.copilot.conn.execute("UPDATE tickets SET suggestion = ? WHERE id = ?", (json.dumps({
+        **json.loads(main.copilot.fetch_one("SELECT suggestion FROM tickets WHERE id = ?", (local_id,))["suggestion"]),
+        "draft_reply": "Hi, we will refund you today.",
+        "warnings": [{"severity": "hard", "kind": "refund", "text": "we will refund"}]}), local_id))
+    main.copilot.conn.commit()
+    r = update(env, add=["ai_approve"])
+    assert "promise" in r.json()["ignored"] and env.fake.public(100) == []
+    assert review_row(local_id) is None
+
+
+def test_an_empty_reviewer_list_means_nobody_not_everybody(env, monkeypatch):
+    monkeypatch.setattr(main.copilot, "allowed_reviewers", set())
+    local_id = arrive(env)
+    assert update(env, add=["ai_approve"]).json()["ignored"].startswith("reviewer is not")
+    assert env.fake.public(100) == [] and review_row(local_id) is None
+
+
+def test_the_allowed_reviewers_setting_must_name_somebody(monkeypatch):
+    from support_copilot import Copilot
+    monkeypatch.setenv("ALLOWED_REVIEWERS", " , ")
+    with pytest.raises(ValueError, match="ALLOWED_REVIEWERS"):
+        Copilot.from_env()

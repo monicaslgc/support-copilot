@@ -25,7 +25,7 @@ class InboundTicket:
 
 def split_tags(value) -> tuple[str, ...]:
     """Tags as a list, or as the space/comma separated string a helpdesk's webhook template renders."""
-    if not value:
+    if not value or not isinstance(value, (str, list, tuple)):  # anything else is not a list of tags
         return ()
     items = re.split(r"[\s,]+", value) if isinstance(value, str) else [str(v) for v in value]
     return tuple(t.strip().lower() for t in items if t and t.strip())

@@ -8,13 +8,13 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from .models import Decision
+from .models import Category, Decision
 
-_LABEL = re.compile(r"^[a-z0-9][a-z0-9_-]*$")  # what helpdesks accept in a tag: no spaces, no capitals
+_LABEL = re.compile(r"[a-z0-9][a-z0-9_-]*")  # what helpdesks accept in a tag: no spaces, no capitals
 
 
 def _check(kind: str, value: str) -> None:
-    if not _LABEL.match(value):
+    if not _LABEL.fullmatch(value):
         raise ValueError(f"{kind} {value!r} must be lowercase letters, digits, '_' or '-' (a valid helpdesk tag)")
 
 
@@ -43,6 +43,11 @@ class Taxonomy:
             _check("decision tag", name)
         if self.approve_tag == self.reject_tag:
             raise ValueError("approve_tag and reject_tag must differ")
+        from .classifier import TEAMS
+        for given, known, what in ((self.category_labels, [c.value for c in Category], "category"),
+                                   (self.team_labels, sorted(set(TEAMS.values())), "team")):
+            if unknown := sorted(set(given) - set(known)):
+                raise ValueError(f"unknown {what} {unknown[0]!r} in the {what} labels: use one of {', '.join(known)}")
         for label in (*self.category_labels.values(), *self.team_labels.values()):
             _check("label", label)
 

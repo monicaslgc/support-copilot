@@ -20,7 +20,8 @@ TYPE_MAP = {  # Zendesk types: problem | incident | question | task
 def verify_signature(secret: str, timestamp: str, body: bytes, signature: str) -> bool:
     """Zendesk webhook signature: base64(HMAC-SHA256(secret, timestamp + body))."""
     digest = hmac.new(secret.encode(), timestamp.encode() + body, hashlib.sha256).digest()
-    return hmac.compare_digest(base64.b64encode(digest).decode(), signature or "")
+    # as bytes: compare_digest raises on text that is not ASCII, and a header is anything a caller sends
+    return hmac.compare_digest(base64.b64encode(digest), (signature or "").encode("utf-8", "replace"))
 
 
 class _Payload(BaseModel):

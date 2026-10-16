@@ -266,12 +266,14 @@ function render() {
   reply.readOnly = !pending;
 
   // Promises in the reply (refunds, guarantees, amounts, deadlines): checked on the server so there is one rulebook.
-  let flags = [], armed = false, timer = null;
+  let flags = [], armed = false, timer = null, checkSeq = 0;
   const flagsBox = el("div", { class: "note", role: "status" });
   flagsBox.hidden = true;
   const refreshFlags = async () => {
+    const seq = ++checkSeq;   // a slow answer for older text must not replace the answer for the current text
     try {
       const r = await api("/check-reply", { method: "POST", body: JSON.stringify({ text: reply.value }) });
+      if (seq !== checkSeq) return;
       flags = r.warnings;
       flagsBox.hidden = !flags.length;
       flagsBox.className = flags.some((f) => f.severity === "hard") ? "banner hard" : "note";
@@ -367,18 +369,19 @@ function render() {
           : `This ticket was ${t.status}.`))])));
 
   if (pending) {
-    const send = async (url, action, done) => {
+    const send = async (url, action, done, extra = {}) => {
       const name = reviewer.value.trim();
       if (!name) { say("Enter your name first.", "err"); reviewer.focus(); return; }
       try { localStorage.setItem("reviewer", name); } catch { /* optional convenience */ }
       if (action === "approved" && !reply.value.trim()) { say("The reply is empty. Write one, or reject the ticket.", "err"); reply.focus(); return; }
+      if (action === "approved") { clearTimeout(timer); await refreshFlags(); }   // the text as it is right now
       if (action === "approved" && flags.some((f) => f.severity === "hard") && !armed) {
         armed = true;
         $("approve").textContent = "Send anyway";
         say("This reply makes a promise a person has to stand behind. Click Send anyway to confirm.", "err");
         return;
       }
-      const body = { action, reviewer: name };
+      const body = { action, reviewer: name, ...extra };
       if (reply.value !== s.draft_reply && reply.value.trim()) body.edited_reply = reply.value;
       if (prio.value !== tr.priority) body.final_priority = prio.value;
       if (cat.value !== tr.category) body.final_category = cat.value;
@@ -389,7 +392,7 @@ function render() {
       buttons.forEach((b) => { b.disabled = true; });
       try {
         const res = await api(url, { method: "POST", body: JSON.stringify(body) });
-        say(done(res), "ok");
+        say(done(res), res.sync === "error" ? "err" : "ok");
         await Promise.all([loadMetrics(), loadList()]);
       } catch (e) {
         say(e.message, "err");
@@ -401,7 +404,9 @@ function render() {
     $("reject").addEventListener("click", () => send(`/tickets/${t.id}/review`, "rejected", (res) => `Ticket #${t.id} rejected${synced(res)}.`));
     if (bulk) {
       bulk.addEventListener("click", () => send(`/clusters/${cl.id}/review`, "approved",
-        (res) => `${res.reviewed.length} tickets approved${res.skipped.length ? `, ${res.skipped.length} skipped` : ""}.`));
+        (res) => `${res.reviewed.length} tickets approved${res.skipped.length ? `, ${res.skipped.length} skipped` : ""}`
+          + `${res.left_pending.length ? `, ${res.left_pending.length} newer left for you to read` : ""}.`,
+        { ticket_ids: cl.pending_ids }));
     }
   }
 }

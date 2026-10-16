@@ -13,6 +13,7 @@ ticket (one to triage it, one to draft the reply when a help article matches).
 """
 import argparse
 import csv
+import io
 import json
 import os
 import sys
@@ -23,10 +24,14 @@ from . import llm
 from .copilot import Copilot, fit_ticket
 
 
-def load(path: Path) -> list[dict]:
-    text = path.read_text(encoding="utf-8-sig")
+def load(path: Path, encoding: str = "utf-8-sig") -> list[dict]:
+    try:
+        text = path.read_text(encoding=encoding)
+    except UnicodeDecodeError:
+        raise SystemExit(f"{path}: not readable as {encoding}. Excel often saves CSV as cp1252: "
+                         "try --encoding cp1252") from None
     if path.suffix.lower() == ".csv":
-        rows = list(csv.DictReader(text.splitlines()))
+        rows = [{k: v for k, v in r.items() if k is not None} for r in csv.DictReader(io.StringIO(text, newline=""))]
     else:
         try:
             rows = json.loads(text)
@@ -56,6 +61,11 @@ def evaluate(rows: list[dict], cp) -> list[dict]:
             "expected_priority": str(row.get("priority") or "").strip().upper(),
         })
     return results
+
+
+def _safe_cell(value):
+    """A spreadsheet runs a cell that starts with = + - @ as a formula: prefix those with an apostrophe."""
+    return "'" + value if isinstance(value, str) and value[:1] in ("=", "+", "-", "@") else value
 
 
 def pct(part: int, whole: int) -> str:
@@ -97,12 +107,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, help="write one row per ticket to this CSV")
     ap.add_argument("--rules", action="store_true", help="never call Claude, even if a key is set")
     ap.add_argument("--limit", type=int, help="only the first N tickets")
+    ap.add_argument("--encoding", default="utf-8-sig", help="the input file's encoding (default utf-8; try cp1252)")
     ap.add_argument("--preview", type=int, default=3, help="how many drafts to print (default 3)")
     args = ap.parse_args(argv)
+    if args.limit is not None and args.limit < 1:
+        ap.error("--limit must be 1 or more")
+    if args.out and args.out.resolve() == args.tickets.resolve():
+        ap.error("--out would overwrite the tickets file: choose another name")
     if args.rules:
         for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             os.environ.pop(var, None)
-    rows = load(args.tickets)[: args.limit]
+    rows = load(args.tickets, args.encoding)[: args.limit]
     if not rows:
         raise SystemExit(f"{args.tickets}: no tickets")
     if llm.enabled():
@@ -114,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         with args.out.open("w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=list(results[0]))
             w.writeheader()
-            w.writerows(results)
+            w.writerows({k: _safe_cell(v) for k, v in r.items()} for r in results)
         print(f"\nwrote {args.out}")
     return 0
 

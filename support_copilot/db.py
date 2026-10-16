@@ -3,6 +3,8 @@ import os
 import sqlite3
 from datetime import UTC, datetime
 
+from .clusters import normalize_customer
+
 
 def connect(path: str | None = None) -> sqlite3.Connection:
     """Open (and create or upgrade) the database. Without a path: TRIAGE_DB, else ./triage.db."""
@@ -18,6 +20,7 @@ def init(conn: sqlite3.Connection) -> sqlite3.Connection:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TEXT NOT NULL,
             subject TEXT NOT NULL, body TEXT NOT NULL, customer TEXT NOT NULL,
+            customer_key TEXT,                  -- clusters.normalize_customer(customer): what is compared
             suggestion TEXT NOT NULL,           -- JSON: triage + articles + draft
             status TEXT NOT NULL DEFAULT 'pending_review',
             system TEXT, external_id TEXT,      -- set when the ticket came from a ticket system
@@ -25,6 +28,7 @@ def init(conn: sqlite3.Connection) -> sqlite3.Connection:
             topic TEXT,                         -- best matching KB article id
             cluster_id INTEGER,                 -- tickets about the same issue share this (parent ticket id)
             duplicate_of INTEGER,               -- same customer, same category, within the window
+            armed INTEGER NOT NULL DEFAULT 1,   -- 0: arrived carrying a decision tag, which is not a decision
             UNIQUE (system, external_id)
         );
         CREATE TABLE IF NOT EXISTS outbox (     -- every call we make to a ticket system, for audit/debug
@@ -55,13 +59,17 @@ def init(conn: sqlite3.Connection) -> sqlite3.Connection:
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
     """Upgrade a database created by an older version (CREATE TABLE IF NOT EXISTS does not add columns)."""
     wanted = {"tickets": {"topic": "TEXT", "cluster_id": "INTEGER", "duplicate_of": "INTEGER",
-                          "category": "TEXT", "priority": "TEXT"},
+                          "category": "TEXT", "priority": "TEXT", "customer_key": "TEXT",
+                          "armed": "INTEGER NOT NULL DEFAULT 1"},
               "reviews": {"ai_reply": "TEXT", "reasons": "TEXT", "note": "TEXT"}}
     for table, cols in wanted.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols.items():
             if name not in have:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    for row in conn.execute("SELECT id, customer FROM tickets WHERE customer_key IS NULL").fetchall():  # backfill
+        conn.execute("UPDATE tickets SET customer_key = ? WHERE id = ?",
+                     (normalize_customer(row["customer"]), row["id"]))
     for row in conn.execute("SELECT id, suggestion FROM tickets WHERE category IS NULL").fetchall():  # backfill
         try:
             triage = json.loads(row["suggestion"]).get("triage", {})
@@ -71,9 +79,10 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
                      (triage.get("category", "other"), triage.get("priority", "P3"), row["id"]))
     for index, columns in (("cluster", "cluster_id"), ("created", "created_at"),
                            ("topic", "topic, category, created_at"),
-                           ("customer", "lower(customer), category, created_at"),
+                           ("customer_key", "customer_key, category, created_at"),
                            ("queue", "status, priority, created_at, id")):
         conn.execute(f"CREATE INDEX IF NOT EXISTS ix_tickets_{index} ON tickets({columns})")
+    conn.execute("DROP INDEX IF EXISTS ix_tickets_customer")  # the old one was on lower(customer): ASCII-only
     conn.commit()
 
 

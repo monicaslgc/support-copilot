@@ -73,11 +73,16 @@ def draft_reply(subject: str, body: str, triage: Triage, articles: list[dict], c
     return draft(subject, body, triage, articles, customer).text
 
 
+_NAME = re.compile(r"[^\W\d_]+(?:[ .'’-][^\W\d_]+){0,3}\.?")
+
+
 def greeting_name(customer: str) -> str:
     """The name to greet, or "" when there is none worth using: "Rui Costa <rui@example.com>" is greeted as
     "Rui Costa", and "unknown" or a bare email address (which says nothing a person would call someone) as nobody."""
-    name = re.sub(r"\s*<[^>]*>", "", customer or "").strip().strip("\"'")
-    return "" if not name or name.lower() == "unknown" or "@" in name else name
+    name = " ".join(re.sub(r"\s*<[^>]*>", "", customer or "").strip().strip("\"'").split())
+    if not name or name.lower() == "unknown" or "@" in name or len(name) > 40 or not _NAME.fullmatch(name):
+        return ""   # a name is words of letters; anything longer or stranger is text a customer typed to be read
+    return name
 
 
 def _template(customer: str, triage: Triage, articles: list[dict]) -> str:

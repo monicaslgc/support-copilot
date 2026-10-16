@@ -18,12 +18,26 @@ from datetime import datetime, timedelta
 UNKNOWN = "unknown"
 
 
+def env_int(name: str, default: int, minimum: int = 1) -> int:
+    """A whole number from the environment, or a message that names the variable (not "invalid literal")."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(f"{name}={raw!r} must be a whole number") from None
+    if value < minimum:
+        raise ValueError(f"{name}={raw!r} must be at least {minimum}")
+    return value
+
+
 def window() -> timedelta:
-    return timedelta(minutes=int(os.getenv("CLUSTER_WINDOW_MIN", "60")))
+    return timedelta(minutes=env_int("CLUSTER_WINDOW_MIN", 60))
 
 
 def spike_min_customers() -> int:
-    return int(os.getenv("SPIKE_MIN_CUSTOMERS", "3"))
+    return env_int("SPIKE_MIN_CUSTOMERS", 3)
 
 
 @dataclass(frozen=True)
@@ -41,8 +55,15 @@ def jaccard(a: frozenset[str], b: frozenset[str]) -> float:
     return len(a & b) / len(a | b) if a and b else 0.0
 
 
+def normalize_customer(name: str) -> str:
+    """The key two spellings of one customer share: case, surrounding and repeated spaces do not matter
+    ("Joana", "joana " and "JOANA" are one customer). It is stored with every ticket and is what the database
+    compares, so counting customers, history and duplicates all agree with each other."""
+    return " ".join((name or "").casefold().split())
+
+
 def same_customer(a: str, b: str) -> bool:
-    a, b = a.strip().casefold(), b.strip().casefold()
+    a, b = normalize_customer(a), normalize_customer(b)
     return bool(a) and a != UNKNOWN and a == b  # "unknown" is the absence of a customer, never a match
 
 

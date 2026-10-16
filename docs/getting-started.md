@@ -192,6 +192,8 @@ Nothing else in your helpdesk depends on it. The tags it added stay on the ticke
 | `"ignored": "reviewer is not allowed ..."` | The agent is not in `ALLOWED_REVIEWERS`, or the payload carries no agent | Add them (compare the email exactly as the helpdesk sends it), or fix the `agent` / `updated_by` field |
 | `"ignored": "already decided"` | The ticket was already approved or rejected, or this is the helpdesk repeating itself | Expected |
 | `"ignored": "both decision tags are set"` | The ticket has `ai_approve` and `ai_reject` | Remove one |
+| `"ignored": "the ticket already carried a decision tag ..."` | The tag was on the ticket when it arrived | Remove it, wait for an update, add it again, or decide in the review page |
+| `"ignored": "the draft makes a promise ..."` | The draft promises a refund or similar | Decide in the review page, where the promise is shown |
 | The response is only `"duplicate": true` | The update has no decision tag in it | The decision trigger's body is missing `tags` (step 7.4), or the trigger fires before the tag is saved |
 | After approval, a Zammad customer got no email | The reply is posted as a non-internal note, which does not email | Known limitation: see [limitations](limitations.md) |
 | Drafts always say a specialist will reply | No article matched | Add the article or its `Keywords:` line (step 2) and check with `evaluate` |

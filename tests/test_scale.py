@@ -69,9 +69,9 @@ def test_the_lookups_use_indexes_instead_of_scanning_the_table():
     make(c, *OUTAGE, customer="newcomer")
     main.copilot.conn.set_trace_callback(None)
     by_topic = [q for q in seen if q.lstrip().startswith("SELECT") and "topic =" in q]
-    by_customer = [q for q in seen if q.lstrip().startswith("SELECT") and "lower(customer) =" in q]
+    by_customer = [q for q in seen if q.lstrip().startswith("SELECT") and "customer_key =" in q]
     assert len(by_topic) == len(by_customer) == 1              # one row each, found through its own index
-    for sql, index in ((by_topic[0], "ix_tickets_topic"), (by_customer[0], "ix_tickets_customer")):
+    for sql, index in ((by_topic[0], "ix_tickets_topic"), (by_customer[0], "ix_tickets_customer_key")):
         plan = " ".join(str(r[3]) for r in main.copilot.conn.execute("EXPLAIN QUERY PLAN " + sql))
         assert index in plan, plan
         assert "SCAN tickets" not in plan, plan
@@ -123,7 +123,10 @@ def test_category_and_priority_are_filled_in_for_tickets_from_an_older_database(
     assert got == [("a", "billing", "P2"), ("b", "other", "P3"), ("c", "other", "P3")]    # unreadable rows: defaults
     assert connect(path) is not None                                                         # safe to run twice
     names = {r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
-    assert {"ix_tickets_topic", "ix_tickets_customer", "ix_tickets_queue", "ix_tickets_cluster"} <= names
+    assert {"ix_tickets_topic", "ix_tickets_customer_key", "ix_tickets_queue", "ix_tickets_cluster"} <= names
+    assert "ix_tickets_customer" not in names                              # the ASCII-only one is dropped
+    keys = [tuple(r) for r in conn.execute("SELECT customer, customer_key, armed FROM tickets ORDER BY id")]
+    assert [k[2] for k in keys] == [1, 1, 1] and all(k[1] == k[0].casefold() for k in keys)   # backfilled
 
 
 # ---------------- an open deployment is called out ----------------

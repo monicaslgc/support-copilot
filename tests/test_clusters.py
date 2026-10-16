@@ -121,7 +121,8 @@ def test_one_customer_sending_three_tickets_is_not_an_incident(clock):
     cl = c.get("/clusters").json()
     assert (cl[0]["size"], cl[0]["customers"], cl[0]["kind"]) == (3, 1, "related")
     assert c.get(f"/tickets/{ids[1]}").json()["duplicate_of"] == ids[0]
-    assert c.post(f"/clusters/{cl[0]['id']}/review", json={"action": "approved", "reviewer": "m"}).status_code == 409
+    assert c.post(f"/clusters/{cl[0]['id']}/review",
+                  json={"action": "approved", "reviewer": "m", "ticket_ids": ids}).status_code == 409
 
 
 def test_a_ticket_after_the_window_starts_fresh(clock):
@@ -184,7 +185,8 @@ def _spike_with_zendesk(clock, customers=("Ana", "Rui", "Sam")):
 
 def test_bulk_approval_without_edit_sends_each_customer_their_own_draft(clock):
     c, fz, cl = _spike_with_zendesk(clock)
-    r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "monica"})
+    r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "monica",
+                                                              "ticket_ids": cl["ticket_ids"]})
     assert r.status_code == 200 and r.json()["reviewed"] == cl["ticket_ids"] and r.json()["skipped"] == []
     for ext, who in zip((300, 301, 302), ("Ana", "Rui", "Sam"), strict=True):
         assert len(fz.public(ext)) == 1 and fz.public(ext)[0].startswith(f"Hi {who},")
@@ -196,7 +198,7 @@ def test_bulk_approval_with_an_edit_sends_the_same_text_to_all(clock):
     c, fz, cl = _spike_with_zendesk(clock)
     c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "monica",
                                                  "edited_reply": "We are aware of the outage and working on it.",
-                                                 "final_priority": "P1"})
+                                                 "final_priority": "P1", "ticket_ids": cl["ticket_ids"]})
     for ext in (300, 301, 302):
         assert fz.public(ext) == ["We are aware of the outage and working on it."]
         assert fz.priority(ext) == "urgent"
@@ -204,7 +206,8 @@ def test_bulk_approval_with_an_edit_sends_the_same_text_to_all(clock):
 
 def test_bulk_rejection_adds_internal_notes_only(clock):
     c, fz, cl = _spike_with_zendesk(clock)
-    c.post(f"/clusters/{cl['id']}/review", json={"action": "rejected", "reviewer": "monica"})
+    c.post(f"/clusters/{cl['id']}/review", json={"action": "rejected", "reviewer": "monica",
+                                                 "ticket_ids": cl["ticket_ids"]})
     assert all(fz.public(e) == [] and "ai_rejected" in fz.tags(e) for e in (300, 301, 302))
 
 
@@ -212,7 +215,8 @@ def test_bulk_skips_tickets_already_reviewed_and_keeps_going(clock):
     c, fz, cl = _spike_with_zendesk(clock)
     first = cl["ticket_ids"][0]
     c.post(f"/tickets/{first}/review", json={"action": "approved", "reviewer": "m", "edited_reply": "Handled."})
-    r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "m"}).json()
+    r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "m",
+                                                              "ticket_ids": cl["ticket_ids"]}).json()
     assert r["reviewed"] == cl["ticket_ids"][1:] and r["skipped"] == []     # only pending ones are even attempted
     assert fz.public(300) == ["Handled."]                                   # the earlier decision is untouched
 
@@ -228,14 +232,15 @@ def test_bulk_skips_a_ticket_a_colleague_reviews_mid_batch(clock, monkeypatch):
         return real(tid, r)
 
     monkeypatch.setattr(main.copilot, "review", racing)
-    r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "monica"}).json()
+    r = c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "monica",
+                                                              "ticket_ids": ids}).json()
     assert r["reviewed"] == [ids[0], ids[2]] and r["skipped"] == [ids[1]]
     assert fz.public(301) == ["Colleague handled it."]                       # no second reply to that customer
 
 
 def test_bulk_review_edge_cases(clock):
     c, fz, cl = _spike_with_zendesk(clock)
-    body = {"action": "approved", "reviewer": "m"}
+    body = {"action": "approved", "reviewer": "m", "ticket_ids": cl["ticket_ids"]}
     assert c.post("/clusters/99999/review", json=body).status_code == 404
     assert c.post(f"/clusters/{cl['id']}/review", json={**body, "action": "pending_review"}).status_code == 422
     assert c.post(f"/clusters/{cl['id']}/review", json=body).status_code == 200
@@ -248,7 +253,8 @@ def test_two_customers_are_related_but_not_bulk_reviewable(clock):
     post(c, "Rui", 1)
     cl = c.get("/clusters").json()[0]
     assert cl["kind"] == "related"
-    assert c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "m"}).status_code == 409
+    assert c.post(f"/clusters/{cl['id']}/review", json={"action": "approved", "reviewer": "m",
+                                                              "ticket_ids": cl["ticket_ids"]}).status_code == 409
 
 
 def test_spikes_are_listed_before_smaller_groups(clock):

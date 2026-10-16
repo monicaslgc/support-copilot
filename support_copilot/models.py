@@ -85,8 +85,8 @@ class Suggestion(BaseModel):
 
 class Review(BaseModel):
     action: Decision
-    reviewer: str
-    edited_reply: str | None = None
+    reviewer: str = Field(min_length=1, max_length=200)
+    edited_reply: str | None = Field(default=None, max_length=10_000)
     final_priority: Priority | None = None
     final_category: Category | None = None
     reasons: list[Reason] = Field(default_factory=list, max_length=len(Reason))
@@ -100,7 +100,20 @@ class Review(BaseModel):
             raise ValueError("the reply is empty: leave edited_reply out to send the draft")
         return v
 
+    @field_validator("reviewer")
+    @classmethod
+    def _named(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("the reviewer is the person who decided: a name or an email")
+        return v.strip()
+
     @field_validator("reasons")
     @classmethod
     def _no_repeats(cls, v: list[Reason]) -> list[Reason]:
         return list(dict.fromkeys(v))
+
+
+class ClusterReview(Review):
+    """One decision for several tickets of an incident: `ticket_ids` are the tickets the reviewer was shown."""
+
+    ticket_ids: list[int] = Field(min_length=1, max_length=500)

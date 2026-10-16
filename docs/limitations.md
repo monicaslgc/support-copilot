@@ -10,8 +10,10 @@ What is not verified, what is a baseline, and what comes next. Back to the [READ
 - The rule-based sentiment and language detection is a small word list, not a model: it misses sarcasm and subtle anger, and short or mixed-language text is often `und`. Treat it as a baseline.
 - Rule-based classification is a baseline, not a production classifier.
 - Zammad: an approved reply is created as a non-internal `note` article, which the customer can see in the web portal. Zammad only emails the customer for an `email` article with a `to` address, and the adapter does not set those (the customer's address is not stored yet), so the customer may not get an email. Zendesk's public comment does notify the requester. Not verified against a live Zammad.
-- No automatic retry for failed ticket-system calls; no check on webhook timestamp age.
+- No automatic retry for failed ticket-system calls, and no button to send again: the decision is saved, the review page shows the failure in red, and `/outbox` holds the error; the reply has to be sent by hand in the helpdesk. No check on webhook timestamp age.
 - A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.
+- The webhook body is capped at 1 MB in the app; also limit the request size in your reverse proxy, which sees it first.
+- Customers are compared by name as the helpdesk sends it (case and spacing ignored): two different people with the same name count as one, and one person who writes under two names counts as two.
 - A single SQLite connection behind a lock: fine for one instance, not for several. Use PostgreSQL to scale out.
 - The API key is one shared secret, not per-user auth, so reviews are attributed to whatever `reviewer` string the caller sends.
 

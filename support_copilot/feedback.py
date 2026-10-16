@@ -11,6 +11,8 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from .clusters import env_int
+
 
 def wilson_lower(successes: int, n: int, z: float = 1.96) -> float:
     """Lower bound of the 95% Wilson score interval for a rate: a conservative estimate of the true rate."""
@@ -23,11 +25,20 @@ def wilson_lower(successes: int, n: int, z: float = 1.96) -> float:
 
 
 def min_reviews() -> int:
-    return int(os.getenv("AUTOMATION_MIN_REVIEWS", "20"))
+    return env_int("AUTOMATION_MIN_REVIEWS", 20)
 
 
 def min_lower_bound() -> float:
-    return float(os.getenv("AUTOMATION_MIN_LOWER_BOUND", "0.9"))
+    raw = os.getenv("AUTOMATION_MIN_LOWER_BOUND")
+    if raw is None or not raw.strip():
+        return 0.9
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"AUTOMATION_MIN_LOWER_BOUND={raw!r} must be a number between 0 and 1") from None
+    if not 0 < value < 1:
+        raise ValueError(f"AUTOMATION_MIN_LOWER_BOUND={raw!r} must be between 0 and 1")
+    return value
 
 
 def _rate(part: int, whole: int) -> float | None:

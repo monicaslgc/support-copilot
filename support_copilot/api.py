@@ -11,13 +11,17 @@ Review and ops endpoints require `X-API-Key` when the Copilot has an api_key (or
 use each ticket system's own signature instead. Add your own authentication around the router as needed.
 """
 from functools import wraps
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from .copilot import MAX_WEBHOOK_BYTES, Copilot, CopilotError
-from .models import Review, Status, TicketIn
+from .models import ClusterReview, Review, Status, TicketIn
+
+# an id larger than SQLite's integers would be a 500 from the database; it is simply not a ticket
+TicketId = Annotated[int, Path(ge=1, le=2**63 - 1)]
 
 
 class ReplyCheck(BaseModel):
@@ -55,12 +59,12 @@ def create_router(cp: Copilot) -> APIRouter:
 
     @api.get("/tickets/{ticket_id}", tags=["tickets"])
     @_http
-    def get_ticket(ticket_id: int):
+    def get_ticket(ticket_id: TicketId):
         return cp.get_ticket(ticket_id)
 
     @api.post("/tickets/{ticket_id}/review", tags=["tickets"])
     @_http
-    def review_ticket(ticket_id: int, r: Review):
+    def review_ticket(ticket_id: TicketId, r: Review):
         return cp.review(ticket_id, r)
 
     @api.post("/check-reply", tags=["tickets"])
@@ -77,9 +81,10 @@ def create_router(cp: Copilot) -> APIRouter:
 
     @api.post("/clusters/{cluster_id}/review", tags=["incidents"])
     @_http
-    def review_cluster(cluster_id: int, r: Review):
-        """One decision for every pending ticket of a possible incident."""
-        return cp.review_cluster(cluster_id, r)
+    def review_cluster(cluster_id: TicketId, r: ClusterReview):
+        """One decision for the tickets of a possible incident that the reviewer was shown (`ticket_ids`) and that
+        are still pending. Tickets that joined later stay pending and are listed in `left_pending`."""
+        return cp.review_cluster(cluster_id, r, r.ticket_ids)
 
     @api.get("/metrics", tags=["metrics"])
     def metrics():
@@ -102,7 +107,11 @@ def create_router(cp: Copilot) -> APIRouter:
         declared = request.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > MAX_WEBHOOK_BYTES:  # refuse before reading it into memory
             raise HTTPException(413, "webhook body too large")
-        raw = await request.body()
+        raw = b""
+        async for chunk in request.stream():  # a running cap: a body sent in chunks has no Content-Length to check
+            raw += chunk
+            if len(raw) > MAX_WEBHOOK_BYTES:
+                raise HTTPException(413, "webhook body too large")
         try:
             # The model and ticket-system calls block for seconds: keep them off the event loop.
             return await run_in_threadpool(cp.handle_webhook, system_name, request.headers, raw)

@@ -13,7 +13,7 @@ These are the routes of `create_router(copilot)` (see the [embedding guide](embe
 | GET | `/tickets/{id}` | One ticket with its triage, draft, history, incident and review |
 | GET | `/tickets?status=` | Review queue, most urgent first. Reviewed tickets include a `review` with the human's decision and the reply that was sent |
 | GET | `/clusters` | Groups of tickets about the same issue that still have something to review, possible incidents first |
-| POST | `/clusters/{id}/review` | One decision for every pending ticket of a possible incident (409 for other groups) |
+| POST | `/clusters/{id}/review` | One decision for the listed `ticket_ids` of a possible incident that are still pending; newer tickets stay pending and come back as `left_pending` (409 for other groups) |
 | POST | `/check-reply` | Promises (refunds, guarantees, amounts, deadlines) in a reply about to be sent |
 | POST | `/tickets/{id}/review` | Human approves or rejects; can correct priority, category and reply |
 | POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`): a new ticket is triaged and queued; an update that adds `ai_approve` or `ai_reject` to a ticket already queued is the person's decision (see below) |
@@ -48,7 +48,7 @@ All settings of the reference server are environment variables. (When you embed 
 | `TAG_PREFIX` | `ai_` | In front of every tag written to the helpdesk (`ai_triaged`, `ai_cat_...`) |
 | `APPROVE_TAG`, `REJECT_TAG` | `approve`, `reject` | The tags (after the prefix) an agent adds to send or discard the draft |
 | `HELPDESK_DECISIONS` | `1` | `0` turns off approving by tag: only the review page and the API decide |
-| `ALLOWED_REVIEWERS` | everyone who can edit the ticket | Comma separated emails who may decide by tag; anyone else's tag is ignored |
+| `ALLOWED_REVIEWERS` | everyone who can edit the ticket | Comma separated emails who may decide by tag; anyone else's tag is ignored. Set but empty is an error |
 | `ALLOW_UNSIGNED_DECISIONS` | `0` | `1` accepts a decision by tag for a connected system without its webhook secret: a trusted network only |
 | `CATEGORY_LABELS`, `TEAM_LABELS` | not set | Your names for ours, like `billing=finance-queries,bug=defects`; they appear in tags and notes |
 | `CLUSTER_WINDOW_MIN` | `60` | Minutes within which tickets can be linked as the same issue or a duplicate |

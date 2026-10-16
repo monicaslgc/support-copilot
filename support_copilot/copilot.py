@@ -12,6 +12,8 @@ import json
 import os
 import sqlite3
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -84,7 +86,10 @@ class Copilot:
         self.systems = systems if systems is not None else build_systems()
         self.api_key = api_key
         self.taxonomy = taxonomy or Taxonomy()
-        self.allowed_reviewers = {r.strip().lower() for r in allowed_reviewers} if allowed_reviewers else None
+        # None: anyone the helpdesk lets edit the ticket. An empty set is "nobody", not "everybody": a typo or an
+        # empty variable must not switch the restriction off.
+        self.allowed_reviewers = ({r.strip().lower() for r in allowed_reviewers}
+                                  if allowed_reviewers is not None else None)
         self.allow_unsigned_decisions = allow_unsigned_decisions
         self.lock = threading.RLock()
 
@@ -93,9 +98,14 @@ class Copilot:
         """A Copilot configured from environment variables, as the reference server is (see docs/api.md):
         TRIAGE_DB, KB_DIR, API_KEY, the ticket-system credentials, the tag and label settings of `Taxonomy.from_env`,
         ALLOWED_REVIEWERS (comma separated) and ALLOW_UNSIGNED_DECISIONS."""
-        reviewers = {r.strip() for r in os.getenv("ALLOWED_REVIEWERS", "").split(",") if r.strip()}
-        return cls(db=db, kb=os.getenv("KB_DIR") or None, taxonomy=Taxonomy.from_env(),
-                   allowed_reviewers=reviewers or None,
+        reviewers = None
+        if os.getenv("ALLOWED_REVIEWERS") is not None:
+            reviewers = {r.strip() for r in os.environ["ALLOWED_REVIEWERS"].split(",") if r.strip()}
+            if not reviewers:
+                raise ValueError("ALLOWED_REVIEWERS is set but lists nobody: that would stop every decision by tag. "
+                                 "List emails separated by commas, or unset it to allow anyone who can edit the ticket")
+        clusters.window(), clusters.spike_min_customers(), feedback.min_reviews(), feedback.min_lower_bound()
+        return cls(db=db, kb=os.getenv("KB_DIR") or None, taxonomy=Taxonomy.from_env(), allowed_reviewers=reviewers,
                    allow_unsigned_decisions=env_flag("ALLOW_UNSIGNED_DECISIONS", False))
 
     # -- access ------------------------------------------------------------------------------------------
@@ -107,6 +117,19 @@ class Copilot:
     def fetch_one(self, sql: str, params: tuple = ()):
         with self.lock:
             return self.conn.execute(sql, params).fetchone()
+
+    @contextmanager
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
+        """The lock and a transaction that is committed on success and rolled back on any error. Without the
+        rollback an exception between a write and its commit leaves the transaction open, and the next
+        successful commit of anything else would make the half-done write permanent."""
+        with self.lock:
+            try:
+                yield self.conn
+                self.conn.commit()
+            except BaseException:
+                self.conn.rollback()
+                raise
 
     def check_api_key(self, supplied: str | None) -> bool:
         """True if the review/ops API may be used. With no key configured the API is open (local development)."""
@@ -168,9 +191,9 @@ class Copilot:
             found.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? AND topic = ? AND category = ?"
                           " ORDER BY created_at, id LIMIT 1", (cutoff, new.topic, new.category)))
         if new.customer.strip() and new.customer.strip().lower() != clusters.UNKNOWN:
-            found.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? AND lower(customer) = lower(?)"
+            found.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? AND customer_key = ?"
                           " AND category = ? ORDER BY created_at, id LIMIT 1",
-                          (cutoff, new.customer.strip(), new.category)))
+                          (cutoff, clusters.normalize_customer(new.customer), new.category)))
         found.append((f"SELECT {cols} FROM tickets WHERE created_at >= ? ORDER BY id DESC LIMIT ?",
                       (cutoff, SIMILARITY_SCAN)))
         rows = {r["id"]: r for sql, params in found for r in self.conn.execute(sql, params)}
@@ -182,30 +205,31 @@ class Copilot:
         ]
 
     def store(self, t: TicketIn, s: Suggestion, system: str | None = None,
-              external_id: str | None = None) -> int | None:
+              external_id: str | None = None, armed: bool = True) -> int | None:
         """Insert a ticket and link it to related ones. Returns None if (system, external_id) already exists
         (a concurrent duplicate webhook). Linking happens under the same lock as the insert, so two tickets
         arriving together always see each other."""
         created = database.now()
         topic = s.articles[0]["id"] if s.articles else None
-        with self.lock:
+        with self._transaction() as conn:
             new = clusters.Item(id=0, customer=t.customer, category=s.triage.category.value, topic=topic,
                                 tokens=frozenset(tokens(f"{t.subject} {t.body}")),
                                 created_at=datetime.fromisoformat(created))
             others = self._candidates(new)
             parent = clusters.find_cluster(new, others)
             duplicate = clusters.find_duplicate(new, others)
-            cur = self.conn.execute(
-                "INSERT INTO tickets (created_at, subject, body, customer, suggestion, system, external_id,"
-                " category, priority, topic, cluster_id, duplicate_of) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+            cur = conn.execute(
+                "INSERT INTO tickets (created_at, subject, body, customer, customer_key, suggestion, system,"
+                " external_id, category, priority, topic, cluster_id, duplicate_of, armed)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT (system, external_id) DO NOTHING",  # not OR IGNORE: it would also hide NOT NULL errors
-                (created, t.subject, t.body, t.customer, s.model_dump_json(), system, external_id,
-                 s.triage.category.value, s.triage.priority.value, topic,
-                 (parent.cluster_id or parent.id) if parent else None, duplicate.id if duplicate else None),
+                (created, t.subject, t.body, t.customer, clusters.normalize_customer(t.customer),
+                 s.model_dump_json(), system, external_id, s.triage.category.value, s.triage.priority.value, topic,
+                 (parent.cluster_id or parent.id) if parent else None, duplicate.id if duplicate else None,
+                 int(armed)),
             )
             if cur.rowcount and parent and parent.cluster_id is None:
-                self.conn.execute("UPDATE tickets SET cluster_id = ? WHERE id = ?", (parent.id, parent.id))
-            self.conn.commit()
+                conn.execute("UPDATE tickets SET cluster_id = ? WHERE id = ?", (parent.id, parent.id))
             return cur.lastrowid if cur.rowcount else None
 
     def list_tickets(self, status: Status | None = None, limit: int = 100) -> list[dict]:
@@ -248,7 +272,8 @@ class Copilot:
         marks = ",".join("?" * len(ids))
         rows = self.fetch_all(
             "SELECT cluster_id, COUNT(*) AS size,"
-            " COUNT(DISTINCT CASE WHEN lower(customer) = 'unknown' THEN 'unknown-' || id ELSE lower(customer) END)"
+            " COUNT(DISTINCT CASE WHEN COALESCE(customer_key, '') IN ('', 'unknown') THEN 'unknown-' || id"
+            " ELSE customer_key END)"
             " AS customers, MIN(created_at) AS first_seen, MAX(created_at) AS last_seen,"
             " SUM(status = 'pending_review') AS pending, MAX(topic) AS topic"
             f" FROM tickets WHERE cluster_id IN ({marks}) GROUP BY cluster_id", tuple(ids))
@@ -277,7 +302,7 @@ class Copilot:
         email, so two people with the same name are indistinguishable). "unknown" has no history."""
         if not customer.strip() or customer.strip().lower() == clusters.UNKNOWN:
             return {"count": 0, "recent": []}
-        where, params = "lower(customer) = lower(?) AND id < ?", (customer.strip(), before_id)
+        where, params = "customer_key = ? AND id < ?", (clusters.normalize_customer(customer), before_id)
         count = self.fetch_one(f"SELECT COUNT(*) AS n FROM tickets WHERE {where}", params)["n"]
         recent = []
         for r in self.fetch_all(f"SELECT id, subject, status, created_at, suggestion FROM tickets WHERE {where}"
@@ -307,11 +332,10 @@ class Copilot:
         except Exception as e:  # noqa: BLE001 - any failure is recorded in the outbox, never raised to the caller
             log.warning("%s %s failed for %s: %s", system.name, kind, ext_id, e)
             mode, payload, err = "error", {"kind": kind}, str(e)
-        with self.lock:
-            self.conn.execute(
+        with self._transaction() as conn:
+            conn.execute(
                 "INSERT INTO outbox (created_at, system, external_id, kind, mode, payload, error)"
                 " VALUES (?,?,?,?,?,?,?)", (database.now(), system.name, ext_id, kind, mode, json.dumps(payload), err))
-            self.conn.commit()
         return mode
 
     def _context(self, tid: int) -> dict:
@@ -390,7 +414,8 @@ class Copilot:
         except WebhookError as e:
             raise CopilotError(422, str(e)) from e
         except ValidationError as e:
-            raise CopilotError(422, json.loads(e.json())) from e
+            # errors() without the input: e.json() raises on text that cannot be encoded (a lone surrogate)
+            raise CopilotError(422, e.errors(include_url=False, include_context=False, include_input=False)) from e
 
         def existing():
             return self.fetch_one("SELECT id FROM tickets WHERE system = ? AND external_id = ?",
@@ -402,7 +427,10 @@ class Copilot:
         s = self.suggest(t)
         if truncated:
             s.notices.append(f"The ticket is long: only its first {MAX_BODY_CHARS:,} characters were used.")
-        tid = self.store(t, s, system.name, inbound.external_id)
+        # A decision tag already on the ticket when it arrives is not a decision (a trigger, a macro or a form can put
+        # it there), and our own note coming back as an update would otherwise look like one: it arms later.
+        decision, conflict = self.taxonomy.decision(inbound.tags)
+        tid = self.store(t, s, system.name, inbound.external_id, armed=decision is None and not conflict)
         if tid is None:  # an identical webhook finished first while we were triaging
             return {"id": existing()["id"], "duplicate": True}
         ctx = self._context(tid)
@@ -425,8 +453,18 @@ class Copilot:
             log.warning("%s ticket %s has both %s and %s: acting on neither", system.name, inbound.external_id,
                         self.taxonomy.approve, self.taxonomy.reject)
             return {**already, "ignored": "both decision tags are set"}
+        row = self.fetch_one("SELECT armed, suggestion FROM tickets WHERE id = ?", (tid,))
         if decision is None:
+            if row and not row["armed"]:  # seen without a decision tag: a tag added from now on is a person's
+                with self._transaction() as conn:
+                    conn.execute("UPDATE tickets SET armed = 1 WHERE id = ?", (tid,))
             return already
+        if row and not row["armed"]:
+            log.warning("%s ticket %s carried a decision tag when it arrived: not a decision", system.name,
+                        inbound.external_id)
+            return {**already, "ignored": "the ticket already carried a decision tag when it arrived: decide in the "
+                                          "review page, or remove the tag and add it again after the helpdesk has "
+                                          "sent an update without it"}
         if system.configured and not os.getenv(system.secret_env) and not self.allow_unsigned_decisions:
             log.warning("%s ticket %s: a decision by tag is ignored because %s is not set", system.name,
                         inbound.external_id, system.secret_env)
@@ -435,6 +473,12 @@ class Copilot:
         if self.allowed_reviewers is not None and actor.lower() not in self.allowed_reviewers:
             log.warning("%s ticket %s: %r may not decide from the helpdesk", system.name, inbound.external_id, actor)
             return {**already, "ignored": "reviewer is not allowed to decide from the helpdesk"}
+        if decision is Decision.APPROVED and row and any(
+                w.get("severity") == "hard" for w in json.loads(row["suggestion"]).get("warnings", [])):
+            log.warning("%s ticket %s: the draft makes a promise, so it is not sent by tag", system.name,
+                        inbound.external_id)
+            return {**already, "ignored": "the draft makes a promise a person must read first: decide in the "
+                                          "review page"}
         try:
             result = self.review(tid, Review(action=decision, reviewer=actor or f"{system.name} agent"))
         except CopilotError as e:
@@ -456,21 +500,19 @@ class Copilot:
         final_cat = r.final_category.value if r.final_category else ai["category"]
         final_pri = r.final_priority.value if r.final_priority else ai["priority"]
         final_reply = r.edited_reply or s["draft_reply"]
-        with self.lock:
+        with self._transaction() as conn:
             # Atomic claim: of two simultaneous reviews exactly one changes the row, the other gets a 409.
-            claimed = self.conn.execute("UPDATE tickets SET status = ? WHERE id = ? AND status = ?",
-                                        (r.action.value, ticket_id, Status.PENDING_REVIEW.value)).rowcount
+            claimed = conn.execute("UPDATE tickets SET status = ? WHERE id = ? AND status = ?",
+                                   (r.action.value, ticket_id, Status.PENDING_REVIEW.value)).rowcount
             if not claimed:
-                self.conn.rollback()
                 raise CopilotError(409, "ticket already reviewed")
-            self.conn.execute(
+            conn.execute(
                 "INSERT INTO reviews (ticket_id, created_at, reviewer, action, final_category, final_priority,"
                 " final_reply, ai_category, ai_priority, ai_reply, reasons, note)"
                 " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (ticket_id, database.now(), r.reviewer, r.action.value, final_cat, final_pri, final_reply,
                  ai["category"], ai["priority"], s["draft_reply"], json.dumps([x.value for x in r.reasons]), r.note),
             )
-            self.conn.commit()
 
         system = self.systems.get(row["system"]) if row["system"] else None
         sync = None
@@ -497,19 +539,24 @@ class Copilot:
         out.sort(key=lambda c: (c["kind"] != "spike", -c["size"], c["id"]))
         return out
 
-    def review_cluster(self, cluster_id: int, r: Review) -> dict:
-        """One decision for every pending ticket of a possible incident. Without `edited_reply` each ticket keeps
-        its own draft; with it, the same text goes to all of them. Each ticket is recorded as its own review."""
+    def review_cluster(self, cluster_id: int, r: Review, ticket_ids: list[int]) -> dict:
+        """One decision for the tickets of a possible incident that the reviewer was shown (`ticket_ids`) and that are
+        still pending. A ticket that joined the incident after that is left pending and reported, never answered
+        unseen. Without `edited_reply` each ticket keeps its own draft; with it, the same text goes to all of them.
+        Each ticket is recorded as its own review."""
         c = self.cluster_stats([cluster_id]).get(cluster_id)
         if not c:
             raise CopilotError(404, "cluster not found")
         if c["kind"] != "spike":
             raise CopilotError(409, "bulk review is only for possible incidents (several different customers)")
-        pending = [t["id"] for t in self.fetch_all(
+        pending_now = [t["id"] for t in self.fetch_all(
             "SELECT id FROM tickets WHERE cluster_id = ? AND status = ? ORDER BY id",
             (cluster_id, Status.PENDING_REVIEW.value))]
+        shown = set(ticket_ids)
+        pending = [tid for tid in pending_now if tid in shown]
+        left_pending = [tid for tid in pending_now if tid not in shown]
         if not pending:
-            raise CopilotError(409, "nothing pending in this cluster")
+            raise CopilotError(409, "nothing pending among the tickets you were shown")
         reviewed, skipped, results = [], [], []
         for tid in pending:
             try:
@@ -519,7 +566,8 @@ class Copilot:
                 if e.status != 409:  # someone reviewed it a moment ago: skip it, keep going
                     raise
                 skipped.append(tid)
-        return {"cluster": cluster_id, "reviewed": reviewed, "skipped": skipped, "results": results}
+        return {"cluster": cluster_id, "reviewed": reviewed, "skipped": skipped, "left_pending": left_pending,
+                "results": results}
 
     # -- how the AI is doing -----------------------------------------------------------------------------
 

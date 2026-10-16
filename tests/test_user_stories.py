@@ -93,7 +93,8 @@ def test_us03_during_an_outage_everyone_is_answered_at_once():
     incident = c.get("/clusters").json()[0]
     assert incident["kind"] == "spike" and incident["customers"] == 4            # one possible incident
 
-    done = c.post(f"/clusters/{incident['id']}/review", json={"action": "approved", "reviewer": "ana"}).json()
+    done = c.post(f"/clusters/{incident['id']}/review", json={"action": "approved", "reviewer": "ana",
+                                                                  "ticket_ids": ids}).json()
     assert done["reviewed"] == ids                                               # every pending ticket answered
     assert all(c.get(f"/tickets/{t}").json()["review"]["reviewer"] == "ana" for t in ids)   # each its own review
 
@@ -102,7 +103,8 @@ def test_us03_during_an_outage_everyone_is_answered_at_once():
     b = ticket(c, f"Widget {words}", f"My widget {words} refuses to sync", "Leo")["id"]
     second = c.get(f"/tickets/{b}").json()
     assert second["duplicate_of"] == a and second["cluster"]["kind"] == "related"
-    refused = c.post(f"/clusters/{second['cluster']['id']}/review", json={"action": "approved", "reviewer": "ana"})
+    refused = c.post(f"/clusters/{second['cluster']['id']}/review", json={"action": "approved", "reviewer": "ana",
+                                                                          "ticket_ids": [a, b]})
     assert refused.status_code == 409                                            # not an incident: no bulk answer
 
 
