@@ -16,6 +16,9 @@ def connect(path: str | None = None) -> sqlite3.Connection:
             suggestion TEXT NOT NULL,           -- JSON: triage + articles + draft
             status TEXT NOT NULL DEFAULT 'pending_review',
             system TEXT, external_id TEXT,      -- set when the ticket came from a ticket system
+            topic TEXT,                         -- best matching KB article id
+            cluster_id INTEGER,                 -- tickets about the same issue share this (parent ticket id)
+            duplicate_of INTEGER,               -- same customer, same category, within the window
             UNIQUE (system, external_id)
         );
         CREATE TABLE IF NOT EXISTS outbox (     -- every call we make to a ticket system, for audit/debug
@@ -37,7 +40,22 @@ def connect(path: str | None = None) -> sqlite3.Connection:
         );
         """
     )
+    _add_missing_columns(conn)
     return conn
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    """Upgrade a database created by an older version (CREATE TABLE IF NOT EXISTS does not add columns)."""
+    wanted = {"tickets": {"topic": "TEXT", "cluster_id": "INTEGER", "duplicate_of": "INTEGER"},
+              "reviews": {"ai_reply": "TEXT"}}
+    for table, cols in wanted.items():
+        have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for name, ddl in cols.items():
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_tickets_cluster ON tickets(cluster_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_tickets_created ON tickets(created_at)")
+    conn.commit()
 
 
 def now() -> str:

@@ -58,6 +58,8 @@ Without credentials the app classifies with keyword rules (offline, deterministi
 | GET | `/` | The review queue page (no data of its own: it calls the API below) |
 | POST | `/tickets` | Triage a ticket and draft a reply (stays `pending_review`) |
 | GET | `/tickets?status=` | Review queue, most urgent first. Reviewed tickets include a `review` with the human's decision and the reply that was sent |
+| GET | `/clusters` | Groups of tickets about the same issue that still have something to review, possible incidents first |
+| POST | `/clusters/{id}/review` | One decision for every pending ticket of a possible incident (409 for other groups) |
 | POST | `/tickets/{id}/review` | Human approves or rejects; can correct priority, category and reply |
 | POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`) |
 | GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`) |
@@ -65,6 +67,19 @@ Without credentials the app classifies with keyword rules (offline, deterministi
 | GET | `/health` | Liveness, whether the LLM is enabled, which ticket systems are configured |
 
 Set `API_KEY` and send it as `X-API-Key` to protect everything except `/health` and the webhooks (which use each system's own signature). If `API_KEY` is not set the API is open, which is only fine on a local machine.
+
+## Duplicates and incident spikes
+
+When an outage starts, the queue fills with near-identical tickets. Reviewing them one by one is slow, and each reviewer answers the same thing. So tickets are linked as they arrive, with rules a reviewer can read:
+
+- **Same issue:** within a time window (60 min by default), tickets with the same best-matching knowledge-base article **and** the same category, or with near-identical text, share a cluster.
+- **Possible incident:** a cluster with tickets from 3 or more different customers (`SPIKE_MIN_CUSTOMERS`). The queue shows a banner, the tickets carry an `incident ×N` badge, and one click approves them all. Without edits each customer gets their own draft; with an edit the same text goes to everyone. Each ticket is still recorded as its own review.
+- **Possible duplicate:** the same customer opening another ticket of the same category in the window. It is only a flag, since a person decides whether it really is a duplicate.
+- The internal note in Zammad or Zendesk says why (`POSSIBLE INCIDENT: 4 tickets from 4 customers about ...`, `Possible duplicate of ...`) and adds the tags `ai_spike` and `ai_possible_duplicate`, so agents who never open this tool still see it. A ticket is tagged when it arrives, so the first reports of an incident are not tagged retroactively.
+
+![Possible incident](docs/incident-spike.png)
+
+Limits: matching is lexical (same words, same article), not semantic. Linking can chain: A joins B and B joins C even if A and C are far apart in time. Bulk reviews count each ticket in `/metrics`, so a large incident weighs heavily on the agreement numbers. Nothing raises a ticket's priority automatically. It only warns.
 
 ## Ticket system integrations
 
@@ -94,6 +109,7 @@ Environment variables:
 - Zammad: `ZAMMAD_URL`, `ZAMMAD_TOKEN`, `ZAMMAD_WEBHOOK_SECRET`
 - Zendesk: `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN`, `ZENDESK_WEBHOOK_SECRET`
 - Core: `ANTHROPIC_API_KEY`, `TRIAGE_MODEL`, `TRIAGE_DB`, `API_KEY`
+- Clustering: `CLUSTER_WINDOW_MIN` (default 60), `SPIKE_MIN_CUSTOMERS` (default 3)
 
 Always set the webhook secret in production; without it the webhook endpoint accepts any caller.
 
@@ -114,7 +130,7 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 
 ## Tests
 
-83 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
+109 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).

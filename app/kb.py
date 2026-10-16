@@ -26,6 +26,10 @@ def _tokens(text: str) -> list[str]:
     return [_stem(t) for t in re.findall(r"\w+", text.lower()) if t not in _STOP and len(t) > 2]
 
 
+def tokens(text: str) -> list[str]:
+    return _tokens(text)
+
+
 class KnowledgeBase:
     def __init__(self, directory: Path = KB_DIR):
         self.docs = []
@@ -36,6 +40,9 @@ class KnowledgeBase:
         n = max(len(self.docs), 1)
         df = Counter(t for d in self.docs for t in d["tf"])
         self.idf = {t: math.log((1 + n) / (1 + c)) + 1 for t, c in df.items()}
+
+    def title(self, article_id: str | None) -> str | None:
+        return next((d["title"] for d in self.docs if d["id"] == article_id), None)
 
     def search(self, query: str, k: int = 3, min_score: float = 0.1, relative: float = 0.35) -> list[dict]:
         """Top-k articles. Besides the absolute floor, drop anything scoring under `relative` x the best match,

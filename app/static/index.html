@@ -42,6 +42,10 @@ ul { list-style: none; margin: 0; padding: 0; }
 .item .sub { color: var(--muted); font-size: 13px; }
 .chip { display: inline-block; font-size: 12px; font-weight: 700; border: 1.5px solid currentColor; border-radius: 999px; padding: 0 8px; margin-right: 6px; }
 .P1 { color: var(--p1); } .P2 { color: var(--p2); } .P3 { color: var(--p3); } .P4 { color: var(--p4); }
+#clusters { display: grid; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+#clusters:empty { display: none; }
+.banner { background: color-mix(in srgb, var(--p2) 14%, transparent); border: 1.5px solid var(--p2); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; }
 .detail { padding: 16px; display: grid; gap: 16px; }
 .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
 h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
@@ -81,6 +85,7 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--p
         </select>
       </label>
     </div>
+    <div id="clusters"></div>
     <ul id="list"></ul>
   </section>
   <section class="panel" id="detail" aria-label="Ticket detail"></section>
@@ -98,7 +103,7 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--p
 const $ = (id) => document.getElementById(id);
 const CATS = ["bug", "billing", "access", "how_to", "feature_request", "other"];
 const PRIOS = ["P1", "P2", "P3", "P4"];
-let tickets = [], selected = null;
+let tickets = [], clusters = [], clusterFilter = null, selected = null;
 
 // Feedback lives outside the detail pane so it survives the re-render that follows a decision.
 function say(msg, cls = "") { const f = $("flash"); f.className = cls; f.textContent = msg; }
@@ -142,8 +147,25 @@ async function loadMetrics() {
   }
 }
 
+function renderClusters() {
+  const box = $("clusters");
+  box.replaceChildren();
+  if ($("filter").value !== "pending_review") return;
+  for (const c of clusters.filter((x) => x.kind === "spike")) {
+    const active = clusterFilter === c.id;
+    const btn = el("button", { class: "link", type: "button", text: active ? "Show all tickets" : `Show these ${c.pending_ids.length}` });
+    btn.addEventListener("click", () => { clusterFilter = active ? null : c.id; selected = null; say(""); loadList(); });
+    box.append(el("div", { class: "banner" }, el("strong", { text: "Possible incident" }),
+      el("div", { text: `${c.size} tickets from ${c.customers} customers about "${c.topic_title || "the same issue"}"` }), btn));
+  }
+}
+
 async function loadList() {
-  tickets = await api(`/tickets?status=${$("filter").value}`);
+  const [all, cl] = await Promise.all([api(`/tickets?status=${$("filter").value}`), api("/clusters")]);
+  clusters = cl;
+  if (clusterFilter && !clusters.some((c) => c.id === clusterFilter)) clusterFilter = null;
+  tickets = clusterFilter ? all.filter((t) => t.cluster && t.cluster.id === clusterFilter) : all;
+  renderClusters();
   const ul = $("list");
   ul.replaceChildren();
   if (!tickets.length) ul.append(el("li", { class: "empty", text: "Nothing here." }));
@@ -151,7 +173,9 @@ async function loadList() {
     const tr = t.suggestion.triage;
     const b = el("button", { class: "item", type: "button", "aria-current": String(selected === t.id) },
       el("span", { class: "subj", text: t.subject }),
-      el("span", { class: "sub" }, chip(tr.priority), document.createTextNode(`${tr.category} · ${t.customer}`)));
+      el("span", { class: "sub" }, chip(tr.priority), document.createTextNode(`${tr.category} · ${t.customer} `),
+        ...(t.cluster ? [el("span", { class: "tag", text: `${t.cluster.kind === "spike" ? "incident" : "related"} ×${t.cluster.size}` })] : []),
+        ...(t.duplicate_of ? [el("span", { class: "tag", text: "possible duplicate" })] : [])));
     b.addEventListener("click", () => { selected = t.id; say(""); render(); });
     ul.append(el("li", {}, b));
   }
@@ -184,6 +208,24 @@ function render() {
   const reviewer = el("input", { type: "text", id: "reviewer", "aria-label": "Your name", placeholder: "Your name" });
   try { reviewer.value = localStorage.getItem("reviewer") || ""; } catch { /* optional convenience */ }
 
+  let bulk = null;
+  const related = el("div", {});
+  const cl = t.cluster;
+  if (cl) {
+    const spike = cl.kind === "spike", what = cl.topic_title || "the same issue";
+    related.append(el("h3", { text: "Related tickets" }), el("div", { class: spike ? "banner" : "note", text: spike
+      ? `Possible incident: ${cl.size} tickets from ${cl.customers} customers about "${what}".`
+      : `${cl.size} tickets about "${what}" in a short window.` }));
+    if (spike && pending && cl.pending > 1) {
+      bulk = el("button", { class: "primary", type: "button", id: "bulk", text: `Approve for all ${cl.pending} pending` });
+      related.append(el("div", { class: "actions" }, bulk, el("span", { class: "note",
+        text: "Unedited: each customer gets their own draft. Edited: the same text goes to all. Priority and category changes apply to all." })));
+    }
+  }
+  if (t.duplicate_of) {
+    related.append(el("div", { class: "note", text: `Possible duplicate of ticket #${t.duplicate_of} (same customer and category, close in time).` }));
+  }
+
   const field = (label, node) => el("div", { class: "field" }, el("label", { text: label }), node);
   const arts = s.articles.length
     ? s.articles.map((a) => el("span", { class: "tag", text: a.title }))
@@ -198,6 +240,7 @@ function render() {
         field("Team", el("div", { text: tr.team })),
         field("Confidence", el("div", { text: `${pct(tr.confidence)} · ${tr.source}` }))),
       el("div", { class: "rationale", text: tr.rationale })),
+    ...(related.children.length ? [related] : []),
     el("div", {}, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
     el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply),
     pending
@@ -211,7 +254,7 @@ function render() {
           : `This ticket was ${t.status}.` })));
 
   if (pending) {
-    const decide = async (action) => {
+    const send = async (url, action, done) => {
       const name = reviewer.value.trim();
       if (!name) { say("Enter your name first.", "err"); reviewer.focus(); return; }
       try { localStorage.setItem("reviewer", name); } catch { /* optional convenience */ }
@@ -219,23 +262,28 @@ function render() {
       if (reply.value !== s.draft_reply) body.edited_reply = reply.value;
       if (prio.value !== tr.priority) body.final_priority = prio.value;
       if (cat.value !== tr.category) body.final_category = cat.value;
-      $("approve").disabled = $("reject").disabled = true;
+      const buttons = [$("approve"), $("reject"), bulk].filter(Boolean);
+      buttons.forEach((b) => { b.disabled = true; });
       try {
-        const res = await api(`/tickets/${t.id}/review`, { method: "POST", body: JSON.stringify(body) });
-        const sync = res.sync ? ` (${res.sync.replace("_", " ")} in the ticket system)` : "";
-        say(`Ticket #${t.id} ${action}${sync}.`, "ok");
+        const res = await api(url, { method: "POST", body: JSON.stringify(body) });
+        say(done(res), "ok");
         await Promise.all([loadMetrics(), loadList()]);
       } catch (e) {
         say(e.message, "err");
-        $("approve").disabled = $("reject").disabled = false;
+        buttons.forEach((b) => { b.disabled = false; });
       }
     };
-    $("approve").addEventListener("click", () => decide("approved"));
-    $("reject").addEventListener("click", () => decide("rejected"));
+    const synced = (res) => (res.sync ? ` (${res.sync.replace("_", " ")} in the ticket system)` : "");
+    $("approve").addEventListener("click", () => send(`/tickets/${t.id}/review`, "approved", (res) => `Ticket #${t.id} approved${synced(res)}.`));
+    $("reject").addEventListener("click", () => send(`/tickets/${t.id}/review`, "rejected", (res) => `Ticket #${t.id} rejected${synced(res)}.`));
+    if (bulk) {
+      bulk.addEventListener("click", () => send(`/clusters/${cl.id}/review`, "approved",
+        (res) => `${res.reviewed.length} tickets approved${res.skipped.length ? `, ${res.skipped.length} skipped` : ""}.`));
+    }
   }
 }
 
-$("filter").addEventListener("change", () => { selected = null; say(""); loadList(); });
+$("filter").addEventListener("change", () => { selected = null; clusterFilter = null; say(""); loadList(); });
 Promise.all([loadMetrics(), loadList()]).catch((e) => { $("detail").replaceChildren(el("div", { class: "empty", text: e.message })); });
 </script>
 </body>

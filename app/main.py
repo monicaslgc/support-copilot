@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import threading
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request
@@ -10,11 +11,11 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
-from . import llm
+from . import clusters, llm
 from .classifier import classify
 from .db import connect, now, row_to_ticket
 from .drafting import draft_reply
-from .kb import KnowledgeBase
+from .kb import KnowledgeBase, tokens
 from .models import Category, Decision, Priority, Review, Status, Suggestion, TicketIn
 from .ticketsystems import TicketSystem, WebhookError, build_systems
 
@@ -56,6 +57,40 @@ def _attach_reviews(tickets: list[dict]) -> list[dict]:
     return tickets
 
 
+def _cluster_stats(ids) -> dict[int, dict]:
+    """Size, distinct customers and kind for each cluster of 2+ tickets. kind is "spike" (a possible
+    incident) when enough different customers are affected, else "related"."""
+    ids = [i for i in set(ids) if i is not None]
+    if not ids:
+        return {}
+    marks = ",".join("?" * len(ids))
+    rows = _all(
+        "SELECT cluster_id, COUNT(*) AS size,"
+        " COUNT(DISTINCT CASE WHEN lower(customer) = 'unknown' THEN 'unknown-' || id ELSE lower(customer) END)"
+        " AS customers, MIN(created_at) AS first_seen, MAX(created_at) AS last_seen,"
+        " SUM(status = 'pending_review') AS pending, MAX(topic) AS topic"
+        f" FROM tickets WHERE cluster_id IN ({marks}) GROUP BY cluster_id", tuple(ids))
+    out = {}
+    for r in rows:
+        if r["size"] < 2:
+            continue
+        out[r["cluster_id"]] = {
+            "id": r["cluster_id"], "size": r["size"], "customers": r["customers"],
+            "kind": "spike" if r["customers"] >= clusters.spike_min_customers() else "related",
+            "topic": r["topic"], "topic_title": kb.title(r["topic"]),
+            "first_seen": r["first_seen"], "last_seen": r["last_seen"], "pending": r["pending"] or 0,
+        }
+    return out
+
+
+def _attach_clusters(tickets: list[dict]) -> list[dict]:
+    """Add `cluster` (null, or the stats of the group of tickets about the same issue) to each ticket."""
+    stats = _cluster_stats([t.get("cluster_id") for t in tickets])
+    for t in tickets:
+        t["cluster"] = stats.get(t.get("cluster_id"))
+    return tickets
+
+
 def require_api_key(x_api_key: str | None = Header(default=None)):
     """Protects the review/ops API. Webhooks are authenticated by each system's own signature instead.
 
@@ -91,14 +126,41 @@ def _suggest(t: TicketIn) -> Suggestion:
     )
 
 
+def _recent_items(new_at: datetime) -> list[clusters.Item]:
+    """Tickets created within the clustering window before `new_at`. Caller holds the lock."""
+    cutoff = (new_at - clusters.window()).isoformat(timespec="seconds")
+    return [
+        clusters.Item(
+            id=r["id"], cluster_id=r["cluster_id"], customer=r["customer"], topic=r["topic"],
+            category=json.loads(r["suggestion"])["triage"]["category"],
+            tokens=frozenset(tokens(f"{r['subject']} {r['body']}")), created_at=datetime.fromisoformat(r["created_at"]))
+        for r in conn.execute(
+            "SELECT id, cluster_id, customer, topic, subject, body, created_at, suggestion"
+            " FROM tickets WHERE created_at >= ?", (cutoff,))
+    ]
+
+
 def _store(t: TicketIn, s: Suggestion, system: str | None = None, external_id: str | None = None) -> int | None:
-    """Insert a ticket. Returns None if (system, external_id) already exists (a concurrent duplicate webhook)."""
+    """Insert a ticket and link it to related ones. Returns None if (system, external_id) already exists
+    (a concurrent duplicate webhook). Linking happens under the same lock as the insert, so two tickets
+    arriving together always see each other."""
+    created = now()
+    topic = s.articles[0]["id"] if s.articles else None
     with _write_lock:
+        new = clusters.Item(id=0, customer=t.customer, category=s.triage.category.value, topic=topic,
+                            tokens=frozenset(tokens(f"{t.subject} {t.body}")),
+                            created_at=datetime.fromisoformat(created))
+        others = _recent_items(new.created_at)
+        parent = clusters.find_cluster(new, others)
+        duplicate = clusters.find_duplicate(new, others)
         cur = conn.execute(
-            "INSERT OR IGNORE INTO tickets (created_at, subject, body, customer, suggestion, system, external_id)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (now(), t.subject, t.body, t.customer, s.model_dump_json(), system, external_id),
+            "INSERT OR IGNORE INTO tickets (created_at, subject, body, customer, suggestion, system, external_id,"
+            " topic, cluster_id, duplicate_of) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (created, t.subject, t.body, t.customer, s.model_dump_json(), system, external_id, topic,
+             (parent.cluster_id or parent.id) if parent else None, duplicate.id if duplicate else None),
         )
+        if cur.rowcount and parent and parent.cluster_id is None:
+            conn.execute("UPDATE tickets SET cluster_id = ? WHERE id = ?", (parent.id, parent.id))
         conn.commit()
         return cur.lastrowid if cur.rowcount else None
 
@@ -120,14 +182,40 @@ def _push(system: TicketSystem, ext_id: str, kind: str, call, *args, **kwargs):
     return mode
 
 
-def _internal_note(s: Suggestion) -> str:
+def _context(tid: int) -> dict:
+    """What we know about how this ticket relates to others, for the internal note and tags."""
+    row = _one("SELECT cluster_id, duplicate_of, system FROM tickets WHERE id = ?", (tid,))
+    cluster = _cluster_stats([row["cluster_id"]]).get(row["cluster_id"]) if row and row["cluster_id"] else None
+    duplicate = None
+    if row and row["duplicate_of"]:
+        d = _one("SELECT id, system, external_id FROM tickets WHERE id = ?", (row["duplicate_of"],))
+        if d:
+            same_system = d["system"] and d["system"] == row["system"]
+            duplicate = f"{d['system']} ticket {d['external_id']}" if same_system else f"ticket #{d['id']}"
+    return {"cluster": cluster, "duplicate_of": duplicate}
+
+
+def _context_tags(ctx: dict) -> list[str]:
+    return (["ai_possible_duplicate"] if ctx["duplicate_of"] else []) + (
+        ["ai_spike"] if ctx["cluster"] and ctx["cluster"]["kind"] == "spike" else [])
+
+
+def _internal_note(s: Suggestion, ctx: dict | None = None) -> str:
     tr = s.triage
     arts = ", ".join(a["title"] for a in s.articles) or "none"
+    lines = []
+    if ctx and ctx["duplicate_of"]:
+        lines.append(f"Possible duplicate of {ctx['duplicate_of']} (same customer and category, close in time).")
+    if c := ctx and ctx["cluster"]:
+        what = f'"{c["topic_title"]}"' if c["topic_title"] else "the same issue"
+        lead = "POSSIBLE INCIDENT" if c["kind"] == "spike" else "Related"
+        lines.append(f"{lead}: {c['size']} tickets from {c['customers']} customers about {what} in a short window.")
+    related = ("\n".join(lines) + "\n") if lines else ""
     return (
         f"[AI triage - pending human review]\n"
         f"Category: {tr.category.value} | Priority: {tr.priority.value} | Team: {tr.team} "
         f"| Confidence: {tr.confidence} ({tr.source})\n"
-        f"Why: {tr.rationale}\nKB articles: {arts}\n\nSuggested reply:\n{s.draft_reply}"
+        f"Why: {tr.rationale}\n{related}KB articles: {arts}\n\nSuggested reply:\n{s.draft_reply}"
     )
 
 
@@ -160,10 +248,11 @@ def _ingest(system: TicketSystem, headers, raw: bytes) -> dict:
     tid = _store(t, s, system.name, inbound.external_id)
     if tid is None:  # an identical webhook finished first while we were triaging
         return {"id": existing()["id"], "duplicate": True}
+    ctx = _context(tid)
     # Internal note only: the customer sees nothing until a human approves.
-    _push(system, inbound.external_id, "triage_note", system.post_internal_note, _internal_note(s),
+    _push(system, inbound.external_id, "triage_note", system.post_internal_note, _internal_note(s, ctx),
           priority=s.triage.priority, category=s.triage.category,
-          tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}"])
+          tags=["ai_triaged", f"ai_cat_{s.triage.category.value}", f"ai_team_{s.triage.team}", *_context_tags(ctx)])
     return {"id": tid, "status": Status.PENDING_REVIEW, "suggestion": s}
 
 
@@ -187,7 +276,7 @@ def list_tickets(status: Status | None = None, limit: int = Query(100, ge=1, le=
     rows = _all(q, (status.value,) if status else ())
     tickets = [row_to_ticket(r) for r in rows]
     tickets.sort(key=lambda t: (t["suggestion"]["triage"]["priority"], t["created_at"]))
-    return _attach_reviews(tickets[:limit])
+    return _attach_clusters(_attach_reviews(tickets[:limit]))
 
 
 @api.get("/tickets/{ticket_id}")
@@ -195,12 +284,11 @@ def get_ticket(ticket_id: int):
     row = _one("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
     if not row:
         raise HTTPException(404, "ticket not found")
-    return _attach_reviews([row_to_ticket(row)])[0]
+    return _attach_clusters(_attach_reviews([row_to_ticket(row)]))[0]
 
 
-@api.post("/tickets/{ticket_id}/review")
-def review_ticket(ticket_id: int, r: Review):
-    """Human decision. Approved replies go to the customer (tickets from a ticket system) as a public reply."""
+def _apply_review(ticket_id: int, r: Review) -> dict:
+    """Record a human decision. Approved replies go to the customer (tickets from a ticket system) as a public reply."""
     row = _one("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
     if not row:
         raise HTTPException(404, "ticket not found")
@@ -234,6 +322,50 @@ def review_ticket(ticket_id: int, r: Review):
         else:
             sync = _push(system, ext, "rejection_note", system.post_rejection, r.reviewer)
     return {"id": ticket_id, "status": r.action, "sync": sync}
+
+
+@api.post("/tickets/{ticket_id}/review")
+def review_ticket(ticket_id: int, r: Review):
+    return _apply_review(ticket_id, r)
+
+
+@api.get("/clusters")
+def list_clusters():
+    """Groups of tickets about the same issue that still have something to review: possible incidents first."""
+    ids = [r["cluster_id"] for r in _all(
+        "SELECT DISTINCT cluster_id FROM tickets WHERE cluster_id IS NOT NULL AND status = 'pending_review'")]
+    out = []
+    for c in _cluster_stats(ids).values():
+        rows = _all("SELECT id, status FROM tickets WHERE cluster_id = ? ORDER BY id", (c["id"],))
+        out.append({**c, "ticket_ids": [r["id"] for r in rows],
+                    "pending_ids": [r["id"] for r in rows if r["status"] == Status.PENDING_REVIEW.value]})
+    out.sort(key=lambda c: (c["kind"] != "spike", -c["size"], c["id"]))
+    return out
+
+
+@api.post("/clusters/{cluster_id}/review")
+def review_cluster(cluster_id: int, r: Review):
+    """One decision for every pending ticket of a possible incident. Without `edited_reply` each ticket keeps
+    its own draft; with it, the same text goes to all of them. Each ticket is recorded as its own review."""
+    c = _cluster_stats([cluster_id]).get(cluster_id)
+    if not c:
+        raise HTTPException(404, "cluster not found")
+    if c["kind"] != "spike":
+        raise HTTPException(409, "bulk review is only for possible incidents (several different customers)")
+    pending = [t["id"] for t in _all("SELECT id FROM tickets WHERE cluster_id = ? AND status = ? ORDER BY id",
+                                     (cluster_id, Status.PENDING_REVIEW.value))]
+    if not pending:
+        raise HTTPException(409, "nothing pending in this cluster")
+    reviewed, skipped, results = [], [], []
+    for tid in pending:
+        try:
+            results.append(_apply_review(tid, r))
+            reviewed.append(tid)
+        except HTTPException as e:
+            if e.status_code != 409:  # someone reviewed it a moment ago: skip it, keep going
+                raise
+            skipped.append(tid)
+    return {"cluster": cluster_id, "reviewed": reviewed, "skipped": skipped, "results": results}
 
 
 @api.get("/metrics")
