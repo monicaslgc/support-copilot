@@ -1,0 +1,6 @@
+/* Brand tokens: Sage #A8B29A, Cream #F6F2E9, Forest Green #263C32, Charcoal #353832. */
+:root { --sage:#A8B29A; --cream:#F6F2E9; --forest:#263C32; --charcoal:#353832; --muted:#5E6357; --line:#CFCBBB; --paper:#FCFAF5;
+  --serif: Georgia, "Times New Roman", serif; --sans: Inter, "DM Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--cream); color: var(--charcoal); font: 400 15px/1.45 var(--sans); }
+.mono { font-family: var(--mono); text-transform: uppercase; letter-spacing: .1em; font-size: 11px; }

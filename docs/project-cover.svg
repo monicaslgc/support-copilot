@@ -4,12 +4,12 @@
   <rect width="1280" height="640" fill="#F6F2E9"/>
   <rect x="48" y="48" width="1184" height="544" rx="4" fill="none" stroke="#263C32" stroke-opacity=".22"/>
   <rect x="48" y="48" width="12" height="544" fill="#A8B29A"/>
-  <text x="92" y="108" fill="#353832" font-family="monospace" font-size="16" letter-spacing="3">INDEPENDENT PROJECT / APPLIED AI</text>
+  <text x="92" y="108" fill="#353832" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="16" letter-spacing="3">INDEPENDENT PROJECT / APPLIED AI</text>
   <text x="88" y="205" fill="#263C32" font-family="Georgia, 'Times New Roman', serif" font-size="76">Support Copilot</text>
-  <text x="92" y="257" fill="#353832" font-family="Arial, sans-serif" font-size="27">AI can prepare the answer.</text>
-  <text x="92" y="294" fill="#353832" font-family="Arial, sans-serif" font-size="27">A person decides what gets sent.</text>
+  <text x="92" y="257" fill="#353832" font-family="Inter, 'DM Sans', Arial, sans-serif" font-size="27">AI can prepare the answer.</text>
+  <text x="92" y="294" fill="#353832" font-family="Inter, 'DM Sans', Arial, sans-serif" font-size="27">A person decides what gets sent.</text>
   <line x1="92" y1="336" x2="1188" y2="336" stroke="#263C32" stroke-opacity=".25"/>
-  <g font-family="Arial, sans-serif" font-size="17" text-anchor="middle">
+  <g font-family="Inter, 'DM Sans', Arial, sans-serif" font-size="17" text-anchor="middle">
     <rect x="92" y="378" width="170" height="78" rx="3" fill="#FFFFFF" stroke="#263C32" stroke-opacity=".25"/>
     <text x="177" y="423" fill="#353832">Ticket</text>
     <path d="M272 417 H300 M292 409 L300 417 L292 425" fill="none" stroke="#263C32" stroke-width="2"/>
@@ -26,6 +26,6 @@
     <rect x="1004" y="378" width="184" height="78" rx="3" fill="#FFFFFF" stroke="#263C32" stroke-opacity=".25"/>
     <text x="1096" y="423" fill="#353832">Customer</text>
   </g>
-  <text x="92" y="526" fill="#353832" font-family="monospace" font-size="14">SYNTHETIC DATA · OFFLINE TESTS · NOT YET VERIFIED AGAINST LIVE SERVICES</text>
+  <text x="92" y="526" fill="#353832" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="14">SYNTHETIC DATA · OFFLINE TESTS · NOT YET VERIFIED AGAINST LIVE SERVICES</text>
   <text x="92" y="558" fill="#263C32" font-family="Georgia, 'Times New Roman', serif" font-size="20">Creative &amp; Analytical — Product · AI · Automation</text>
 </svg>
