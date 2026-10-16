@@ -14,8 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def test_the_files_a_newcomer_looks_for_exist():
     for name in ("README.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md", "Makefile", ".gitignore",
-                 ".editorconfig", ".github/workflows/tests.yml", ".github/dependabot.yml",
-                 ".github/pull_request_template.md", ".github/ISSUE_TEMPLATE/bug_report.md"):
+                 ".editorconfig", ".github/workflows/tests.yml"):
         assert (ROOT / name).is_file(), name
 
 

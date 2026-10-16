@@ -1,9 +1,0 @@
-/* Colours shared by the image sources in docs/src. --muted is darker than the muted green
-   (#6F8876) so small text keeps AA contrast. */
-:root { --sage:#A0B3A0; --cream:#F4F1E8; --forest:#153D32; --charcoal:#202A27; --muted:#4C6354; --line:#D6D9D0; --panel:#DDE5DC; --paper:#FAF8F2;
-  --serif: "DM Serif Display", "Cormorant Garamond", Georgia, serif; --sans: Inter, "DM Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace; }
-* { box-sizing: border-box; margin: 0; }
-body { background: var(--cream); color: var(--charcoal); font: 400 15px/1.45 var(--sans); }
-.mono { font-family: var(--mono); text-transform: uppercase; letter-spacing: .1em; font-size: 11px; }
-.blobs { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
-.blobs i { position:absolute; background: var(--sage); border-radius: 50%; }

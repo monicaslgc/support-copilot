@@ -40,4 +40,3 @@ select = ["E", "F", "I", "UP", "B", "BLE", "S110"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/conftest.py" = ["E402"]   # env vars must be set before app is imported
-"docs/src/architecture.py" = ["E501"]   # drawing code
