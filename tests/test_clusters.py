@@ -305,6 +305,6 @@ def test_a_database_from_before_this_feature_is_upgraded(tmp_path):
     conn = connect(path)
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(tickets)")}
     assert {"topic", "cluster_id", "duplicate_of"} <= cols
-    assert "ai_reply" in {r["name"] for r in conn.execute("PRAGMA table_info(reviews)")}
+    assert {"ai_reply", "reasons", "note"} <= {r["name"] for r in conn.execute("PRAGMA table_info(reviews)")}
     assert conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0] == 1          # data kept
     connect(path)                                                                   # and it is safe to run again

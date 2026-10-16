@@ -11,7 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
-from . import clusters, llm
+from . import clusters, feedback, llm
 from .classifier import classify
 from .db import connect, now, row_to_ticket
 from .drafting import draft_reply
@@ -49,9 +49,10 @@ def _attach_reviews(tickets: list[dict]) -> list[dict]:
     by_ticket = {}
     if ids:
         marks = ",".join("?" * len(ids))
-        for r in _all(f"SELECT ticket_id, reviewer, action, final_category, final_priority, final_reply, created_at"
-                      f" FROM reviews WHERE ticket_id IN ({marks})", tuple(ids)):
+        for r in _all(f"SELECT ticket_id, reviewer, action, final_category, final_priority, final_reply, created_at,"
+                      f" reasons, note FROM reviews WHERE ticket_id IN ({marks})", tuple(ids)):
             by_ticket[r["ticket_id"]] = {k: r[k] for k in r.keys() if k != "ticket_id"}
+            by_ticket[r["ticket_id"]]["reasons"] = json.loads(r["reasons"] or "[]")
     for t in tickets:
         t["review"] = by_ticket.get(t["id"])
     return tickets
@@ -338,9 +339,9 @@ def _apply_review(ticket_id: int, r: Review) -> dict:
             raise HTTPException(409, "ticket already reviewed")
         conn.execute(
             "INSERT INTO reviews (ticket_id, created_at, reviewer, action, final_category, final_priority,"
-            " final_reply, ai_category, ai_priority, ai_reply) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            " final_reply, ai_category, ai_priority, ai_reply, reasons, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (ticket_id, now(), r.reviewer, r.action.value, final_cat, final_pri, final_reply,
-             ai["category"], ai["priority"], s["draft_reply"]),
+             ai["category"], ai["priority"], s["draft_reply"], json.dumps([x.value for x in r.reasons]), r.note),
         )
         conn.commit()
 
@@ -413,6 +414,14 @@ def metrics():
         "priority_agreement": round(sum(r["ai_priority"] == r["final_priority"] for r in rows) / n, 2),
         "reply_edit_rate": round(sum(r["ai_reply"] != r["final_reply"] for r in rows) / n, 2),
     }
+
+
+@api.get("/metrics/breakdown")
+def metrics_breakdown():
+    """Quality of the AI per category, why humans corrected it, and where it may have earned more autonomy."""
+    return feedback.breakdown(_all(
+        "SELECT action, ai_category, ai_priority, ai_reply, final_category, final_priority, final_reply, reasons"
+        " FROM reviews"))
 
 
 @api.get("/outbox")

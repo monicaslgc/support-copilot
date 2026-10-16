@@ -36,7 +36,9 @@ def connect(path: str | None = None) -> sqlite3.Connection:
             reviewer TEXT NOT NULL, action TEXT NOT NULL,
             final_category TEXT, final_priority TEXT, final_reply TEXT,
             ai_category TEXT, ai_priority TEXT,  -- kept to measure AI accuracy
-            ai_reply TEXT
+            ai_reply TEXT,
+            reasons TEXT,                        -- JSON list of why the human corrected or rejected the AI
+            note TEXT
         );
         """
     )
@@ -47,7 +49,7 @@ def connect(path: str | None = None) -> sqlite3.Connection:
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
     """Upgrade a database created by an older version (CREATE TABLE IF NOT EXISTS does not add columns)."""
     wanted = {"tickets": {"topic": "TEXT", "cluster_id": "INTEGER", "duplicate_of": "INTEGER"},
-              "reviews": {"ai_reply": "TEXT"}}
+              "reviews": {"ai_reply": "TEXT", "reasons": "TEXT", "note": "TEXT"}}
     for table, cols in wanted.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols.items():

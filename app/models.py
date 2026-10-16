@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Priority(StrEnum):
@@ -38,6 +38,18 @@ class Decision(StrEnum):
     REJECTED = "rejected"
 
 
+class Reason(StrEnum):
+    """Why a reviewer corrected or rejected the AI. Optional, but it is the feedback that improves it."""
+
+    WRONG_CATEGORY = "wrong_category"
+    WRONG_PRIORITY = "wrong_priority"
+    TONE = "tone"
+    MISSING_INFO = "missing_info"
+    INACCURATE = "inaccurate"
+    DUPLICATE = "duplicate"
+    OTHER = "other"
+
+
 class TicketIn(BaseModel):
     subject: str = Field(min_length=3, max_length=200)
     body: str = Field(min_length=3, max_length=10_000)
@@ -67,3 +79,10 @@ class Review(BaseModel):
     edited_reply: str | None = None
     final_priority: Priority | None = None
     final_category: Category | None = None
+    reasons: list[Reason] = Field(default_factory=list, max_length=len(Reason))
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("reasons")
+    @classmethod
+    def _no_repeats(cls, v: list[Reason]) -> list[Reason]:
+        return list(dict.fromkeys(v))

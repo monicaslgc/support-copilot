@@ -19,6 +19,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
 header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 14px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
 header h1 { font-size: 17px; margin: 0; }
@@ -47,6 +48,11 @@ ul { list-style: none; margin: 0; padding: 0; }
 .banner { background: color-mix(in srgb, var(--p2) 14%, transparent); border: 1.5px solid var(--p2); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
 .link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; }
 .hist li { padding: 2px 0; }
+.why { display: inline-block; margin-right: 12px; font-size: 13px; }
+#insights { max-width: 1200px; margin: 16px auto; padding: 16px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .detail { padding: 16px; display: grid; gap: 16px; }
 .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
 h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 6px; }
@@ -71,6 +77,7 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--p
 <body>
 <header>
   <h1>support-copilot <span class="note">review queue</span></h1>
+  <button class="link" type="button" id="tab">Insights</button>
   <div class="metrics" id="metrics" aria-live="polite"></div>
 </header>
 <div id="flash" role="status" aria-live="polite"></div>
@@ -91,6 +98,7 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--p
   </section>
   <section class="panel" id="detail" aria-label="Ticket detail"></section>
 </main>
+<section class="panel" id="insights" hidden aria-label="Insights"></section>
 <dialog id="keydlg">
   <form method="dialog">
     <p>This server requires an API key.</p>
@@ -137,7 +145,7 @@ const langName = (c) => {
   if (!c || c === "und") return "unclear";
   try { return new Intl.DisplayNames(["en"], { type: "language" }).of(c) || c; } catch { return c; }
 };
-const pct = (v) => (v === undefined ? "–" : `${Math.round(v * 100)}%`);
+const pct = (v) => (v === undefined || v === null ? "–" : `${Math.round(v * 100)}%`);
 
 async function loadMetrics() {
   const m = await api("/metrics");
@@ -214,6 +222,22 @@ function render() {
   const reviewer = el("input", { type: "text", id: "reviewer", "aria-label": "Your name", placeholder: "Your name" });
   try { reviewer.value = localStorage.getItem("reviewer") || ""; } catch { /* optional convenience */ }
 
+  const REASONS = [["wrong_category", "Wrong category"], ["wrong_priority", "Wrong priority"], ["tone", "Tone"],
+    ["missing_info", "Missing info"], ["inaccurate", "Inaccurate"], ["duplicate", "Duplicate"], ["other", "Other"]];
+  const why = el("div", {}, el("h3", { text: "If you change or reject it, why? (optional)" }));
+  const boxes = REASONS.map(([value, label]) => {
+    const cb = el("input", { type: "checkbox", id: `why-${value}`, value });
+    why.append(el("label", { class: "why" }, cb, document.createTextNode(` ${label}`)));
+    return cb;
+  });
+  const noteIn = el("input", { type: "text", id: "note", maxlength: "500", placeholder: "Add a note (optional)",
+    "aria-label": "Note" });
+  noteIn.style.cssText = "display:block;width:100%;margin-top:8px";
+  why.append(noteIn);
+  const tick = (value, on) => { boxes.find((b) => b.value === value).checked = on; };
+  prio.addEventListener("change", () => tick("wrong_priority", prio.value !== tr.priority));
+  cat.addEventListener("change", () => tick("wrong_category", cat.value !== tr.category));
+
   let bulk = null;
   const related = el("div", {});
   const cl = t.cluster;
@@ -259,6 +283,7 @@ function render() {
     ...(hist.children.length ? [hist] : []),
     el("div", {}, el("h3", { text: "Knowledge base" }), el("div", {}, ...arts)),
     el("div", {}, el("h3", { text: pending ? "Draft reply (edit before approving)" : "Reply as sent" }), reply),
+    ...(pending ? [why] : []),
     pending
       ? el("div", { class: "actions" }, reviewer,
           Object.assign(el("button", { class: "primary", type: "button", id: "approve", text: "Approve and send" }), {}),
@@ -267,6 +292,8 @@ function render() {
       : el("div", { class: "note", text: rv
           ? `${t.status[0].toUpperCase()}${t.status.slice(1)} by ${rv.reviewer} on ${rv.created_at.slice(0, 10)}. `
             + `AI suggested ${tr.priority} / ${tr.category}${rv.final_reply === s.draft_reply ? "" : "; reply was edited"}.`
+            + (rv.reasons && rv.reasons.length ? ` Reasons: ${rv.reasons.map((x) => x.replace("_", " ")).join(", ")}.` : "")
+            + (rv.note ? ` Note: ${rv.note}` : "")
           : `This ticket was ${t.status}.` })));
 
   if (pending) {
@@ -278,6 +305,9 @@ function render() {
       if (reply.value !== s.draft_reply) body.edited_reply = reply.value;
       if (prio.value !== tr.priority) body.final_priority = prio.value;
       if (cat.value !== tr.category) body.final_category = cat.value;
+      const reasons = boxes.filter((b) => b.checked).map((b) => b.value);
+      if (reasons.length) body.reasons = reasons;
+      if (noteIn.value.trim()) body.note = noteIn.value.trim();
       const buttons = [$("approve"), $("reject"), bulk].filter(Boolean);
       buttons.forEach((b) => { b.disabled = true; });
       try {
@@ -298,6 +328,34 @@ function render() {
     }
   }
 }
+
+async function loadInsights() {
+  const m = await api("/metrics/breakdown");
+  const box = $("insights");
+  box.replaceChildren(el("h3", { text: "How the AI is doing, per category" }));
+  if (!m.reviewed) { box.append(el("div", { class: "empty", text: "No reviews yet." })); return; }
+  const th = (t) => el("th", { text: t });
+  const td = (t) => el("td", { text: String(t) });
+  const head = ["Category", "Reviewed", "Clean", "Clean, lower bound", "Replies edited", "Rejected", "Automation candidate"];
+  const rows = m.by_category.map((c) => el("tr", {}, td(c.category), td(c.reviewed), td(pct(c.clean_rate)),
+    td(pct(c.clean_rate_lower_bound)), td(pct(c.reply_edit_rate)), td(pct(c.rejection_rate)),
+    td(c.automation_candidate ? "yes" : "not yet")));
+  box.append(el("table", {}, el("thead", {}, el("tr", {}, ...head.map(th))), el("tbody", {}, ...rows)),
+    el("p", { class: "note", text: `Clean means approved with the category, priority and reply untouched. A category shows "yes" after `
+      + `${m.automation.min_reviews}+ reviews with a lower bound of ${pct(m.automation.min_lower_bound)} or more: a few perfect reviews are not enough. `
+      + m.automation.note }));
+  const entries = Object.entries(m.reasons);
+  box.append(el("h3", { text: `Why people corrected it (${pct(m.reason_coverage)} of ${m.overrides} corrections explained)` }),
+    el("div", {}, ...(entries.length ? entries.map(([k, v]) => el("span", { class: "tag", text: `${k.replace("_", " ")} ×${v}` }))
+      : [el("span", { class: "note", text: "No reasons recorded yet." })])));
+}
+$("tab").addEventListener("click", async () => {
+  const on = $("insights").hidden;
+  $("insights").hidden = !on;
+  document.querySelector("main").hidden = on;
+  $("tab").textContent = on ? "Back to queue" : "Insights";
+  if (on) { try { await loadInsights(); } catch (e) { $("insights").replaceChildren(el("div", { class: "empty", text: e.message })); } }
+});
 
 $("filter").addEventListener("change", () => { selected = null; clusterFilter = null; say(""); loadList(); });
 Promise.all([loadMetrics(), loadList()]).catch((e) => { $("detail").replaceChildren(el("div", { class: "empty", text: e.message })); });

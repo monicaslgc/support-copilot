@@ -64,6 +64,7 @@ Without credentials the app classifies with keyword rules (offline, deterministi
 | POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`) |
 | GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`) |
 | GET | `/metrics` | Human vs AI agreement and reply edit rate |
+| GET | `/metrics/breakdown` | Per category: clean rate, its lower bound, rejections, reasons, automation candidates |
 | GET | `/health` | Liveness, whether the LLM is enabled, which ticket systems are configured |
 
 Set `API_KEY` and send it as `X-API-Key` to protect everything except `/health` and the webhooks (which use each system's own signature). If `API_KEY` is not set the API is open, which is only fine on a local machine.
@@ -94,6 +95,21 @@ The triage records two more signals, and the reviewer sees who the customer is:
 
 Knowledge-base articles can carry a `Keywords:` line with synonyms and other languages. Retrieval is lexical, so that is what lets a Portuguese ticket find an English article without the model.
 
+## Feedback: why people correct the AI, and where it has earned more autonomy
+
+A single "95% agreement" hides where the AI is weak. The review page therefore asks, optionally, *why* a reviewer changed or rejected something (wrong category, wrong priority, tone, missing info, inaccurate, duplicate, other, plus a short note). Changing the priority or the category ticks the matching box for you. The **Insights** view and `GET /metrics/breakdown` turn the reviews into numbers per category:
+
+- **Clean rate:** the share of reviews approved with the category, priority and reply untouched. A rejection counts against it.
+- **Lower bound:** the lower end of a 95% Wilson score interval on the clean rate. Three perfect reviews score 44%, 35 score 90%: a few good reviews are not evidence. Rejections and corrections pull it down.
+- **Automation candidate:** a category with at least `AUTOMATION_MIN_REVIEWS` reviews (20) and a lower bound of at least `AUTOMATION_MIN_LOWER_BOUND` (0.9), which in practice means about 35 clean reviews in a row. This is **informational only: nothing is ever automated**. It marks where a human could reasonably decide to automate.
+- **Reasons:** how often each reason was given, and what share of corrections have one at all (a low number means the feedback is not being filled in).
+
+![Insights](docs/insights.png)
+
+The screenshot uses synthetic reviews generated for the demo. It also shows why the breakdown exists: the headline numbers on top read 100% category agreement, while the `bug` category is clean only 60% of the time.
+
+Limits: the interval assumes reviews are independent and from similar tickets, which a burst from one incident is not; the reasons are recorded but not yet fed back into the prompts or an evaluation set, which is the obvious next step; per-category numbers group by the category the AI proposed; a bulk decision counts once per ticket.
+
 ## Ticket system integrations
 
 ```
@@ -123,6 +139,7 @@ Environment variables:
 - Zendesk: `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN`, `ZENDESK_WEBHOOK_SECRET`
 - Core: `ANTHROPIC_API_KEY`, `TRIAGE_MODEL`, `TRIAGE_DB`, `API_KEY`
 - Clustering: `CLUSTER_WINDOW_MIN` (default 60), `SPIKE_MIN_CUSTOMERS` (default 3)
+- Feedback: `AUTOMATION_MIN_REVIEWS` (default 20), `AUTOMATION_MIN_LOWER_BOUND` (default 0.9)
 
 Always set the webhook secret in production; without it the webhook endpoint accepts any caller.
 
@@ -143,7 +160,7 @@ Implement `TicketSystem` (`app/ticketsystems/base.py`): `verify_webhook`, `parse
 
 ## Tests
 
-171 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
+196 tests, run on Python 3.11 and 3.12 in CI together with `ruff`. The review page was also driven in a real browser (Chromium) to check the approve and reject flows, the mobile layout and that a hostile ticket (`<script>`, `<img onerror>`) is shown as text and never executed; that browser run is a manual check, not part of CI.
 
 - **End to end, for every ticket system:** the same scenarios run against stateful fakes of the Zammad and Zendesk APIs that apply each system's update semantics (additive tags, public vs internal), and assert the final state of the ticket, not just the requests sent.
 - **The Claude path:** a fake SDK checks the request shape (model, low effort, enough `max_tokens` for thinking, timeout, fenced ticket text, no removed parameters) and every kind of unusable reply (refusal, truncation, thinking block first, not JSON, unknown category, missing keys, API error).
