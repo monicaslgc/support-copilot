@@ -4,7 +4,7 @@
 
 - **Positioning:** Creative & Analytical | Product + AI + Automation
 - **Stack:** Python, FastAPI, Pydantic, SQLite, Anthropic SDK; a plain HTML and JavaScript review page; Zammad and Zendesk adapters
-- **Evidence in the repository:** 332 offline tests on Python 3.11 and 3.12 with `ruff` in CI; eleven user stories, each with an acceptance test; the main behaviours replayable with `python scripts/demo.py all`; mutation-style checks documented in `docs/engineering.md`
+- **Evidence in the repository:** 379 offline tests on Python 3.11 and 3.12 with `ruff` in CI; twelve user stories, each with an acceptance test; the main behaviours replayable with `python scripts/demo.py all`; mutation-style checks documented in `docs/engineering.md`
 - **Not claimed:** production readiness, live Zammad, Zendesk or Claude API verification, measured business impact, security guarantees. See `docs/limitations.md`.
 - **Companion project:** [agent-triage-kit](https://github.com/monicaslgc/agent-triage-kit), the opposite end of the autonomy spectrum.
 

@@ -22,7 +22,7 @@ Four decisions I would defend:
 
 When an outage hits, near-identical tickets are grouped into one possible incident and answered with one click, still as individual reviews.
 
-What I took from it: a useful AI system needs more than good outputs. It needs clear boundaries, deterministic checks where they fit, human judgement and behaviour you can test. That is why it has 332 offline tests, with each user story as an executable acceptance test.
+What I took from it: a useful AI system needs more than good outputs. It needs clear boundaries, deterministic checks where they fit, human judgement and behaviour you can test. That is why it has 379 offline tests, with each user story as an executable acceptance test.
 
 What it is not: the Zammad and Zendesk adapters are tested against fakes, the Claude path against a fake SDK, and the guardrails have documented gaps (names and addresses are not masked; an oddly worded promise gets through). A person still reads every reply. I would rather say that plainly.
 

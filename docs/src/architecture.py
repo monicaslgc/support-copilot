@@ -168,7 +168,7 @@ def architecture():
     d.node("tr", xs[2], y, "wf", "flow", "Triage", "claude or rules", ["category, P1 to P4,", "sentiment, language"])
     d.node("dr", xs[3], y, "wf", "doc", "Draft reply", "claude or template", ["help article, in the", "customer's language"])
     d.node("ck", xs[4], y, "wf", "check", "Check and link", "plain rules", ["promises flagged,", "incidents grouped"])
-    d.node("hu", xs[5], y, "human", "person", "Human approval", "approve or reject", ["edit first; one click", "for a whole incident"])
+    d.node("hu", xs[5], y, "human", "person", "Human approval", "in your helpdesk", ["tag ai_approve or ai_reject,", "or use the review page"])
     d.node("cu", xs[6], y, "ext", "chat", "Customer", "after approval only", ["public reply; the AI's", "notes stay internal"])
     d.node("me", 1180, 250, "data", "table", "Per-category metrics", "informational", ["clean rate and a", "confidence bound"], lp="r")
     for a_, b_ in (("tk", "mk"), ("mk", "tr"), ("tr", "dr"), ("dr", "ck"), ("ck", "hu")):

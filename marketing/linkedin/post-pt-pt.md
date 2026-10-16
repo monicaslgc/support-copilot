@@ -22,7 +22,7 @@ Quatro decisões que defendo:
 
 Numa falha de serviço, os tickets quase idênticos ficam agrupados num possível incidente e respondidos com um clique, continuando a ser revisões individuais.
 
-O que levo daqui: um sistema de IA útil precisa de mais do que bons resultados. Precisa de limites claros, verificações determinísticas onde fazem sentido, juízo humano e comportamento que se possa testar. Por isso tem 332 testes offline, com cada história de utilizador como teste de aceitação executável.
+O que levo daqui: um sistema de IA útil precisa de mais do que bons resultados. Precisa de limites claros, verificações determinísticas onde fazem sentido, juízo humano e comportamento que se possa testar. Por isso tem 379 testes offline, com cada história de utilizador como teste de aceitação executável.
 
 O que não é: os adaptadores de Zammad e Zendesk foram testados contra simulações, o caminho do Claude contra um SDK simulado, e as proteções têm lacunas documentadas (nomes e moradas não são mascarados; uma promessa com redação invulgar passa). Uma pessoa continua a ler cada resposta. Prefiro dizê-lo com clareza.
 

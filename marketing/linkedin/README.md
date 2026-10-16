@@ -38,5 +38,5 @@ Used in the post, from the kit's short list: `#AI #ProductManagement #Automation
 
 - Merge the branch and make sure the images in `docs/` are on `main`, so the repository link shows them.
 - Set the GitHub social preview (see [docs/presentation.md](../../docs/presentation.md)), so the link card looks right.
-- Re-read the claims against the repository on the day: the test count (332) changes whenever tests are added.
+- Re-read the claims against the repository on the day: the test count and the number of user stories change whenever tests or stories are added.
 - Add the link in the post or in the first comment, then publish it yourself.
