@@ -28,10 +28,12 @@ from .kb import KnowledgeBase, tokens
 from .llm import log
 from .models import Category, Decision, Flag, Priority, Review, Sentiment, Status, Suggestion, TicketIn, Triage
 from .ticketsystems import TicketSystem, WebhookError, build_systems
+from .ticketsystems.base import REPLY_MARKER
 
 SIMILARITY_SCAN = 200  # how many of the latest tickets are compared by text; the other rules use indexes
 MAX_WEBHOOK_BYTES = 1_000_000
 MAX_BODY_CHARS = 10_000  # what a ticket body may hold (models.TicketIn)
+MAX_REPLY_CHARS = 10_000  # what an edited reply may hold (models.Review)
 
 
 def fit_ticket(subject: str, body: str, customer: str = "unknown") -> tuple[TicketIn, bool]:
@@ -427,7 +429,9 @@ class Copilot:
         if not tx.helpdesk_decisions:
             return ""
         return (f"\nTo send the suggested reply to the customer, add the tag {tx.approve}. "
-                f"To discard it and answer yourself, add the tag {tx.reject}. Nothing is sent until then.\n")
+                f"To discard it and answer yourself, add the tag {tx.reject}. Nothing is sent until then.\n"
+                f"To change the text first, add an internal note that starts with {REPLY_MARKER} and holds your "
+                f"reply, in the same update as the tag.\n")
 
     def handle_webhook(self, system_name: str, headers, raw: bytes) -> dict:
         """One inbound webhook from a ticket system: verify, triage, queue, write an internal note back.
@@ -504,14 +508,27 @@ class Copilot:
         if self.allowed_reviewers is not None and actor.lower() not in self.allowed_reviewers:
             log.warning("%s ticket %s: %r may not decide from the helpdesk", system.name, inbound.external_id, actor)
             return {**already, "ignored": "reviewer is not allowed to decide from the helpdesk"}
-        if decision is Decision.APPROVED and row and any(
+        edited = inbound.edited_reply if decision is Decision.APPROVED else None  # a reject has no reply to edit
+        if edited is not None:
+            if not edited:
+                return {**already, "ignored": f"the {REPLY_MARKER} note is empty: write the reply after it, or "
+                                              "remove the note to send the draft"}
+            if len(edited) > MAX_REPLY_CHARS:
+                return {**already, "ignored": f"the edited reply is longer than {MAX_REPLY_CHARS:,} characters"}
+            if guardrails.hard_commitments(guardrails.find_commitments(edited)):
+                log.warning("%s ticket %s: the edited reply makes a promise, so it is not sent by tag", system.name,
+                            inbound.external_id)
+                return {**already, "ignored": "the edited reply makes a promise a person must read first: decide in "
+                                              "the review page"}
+        elif decision is Decision.APPROVED and row and any(
                 w.get("severity") == "hard" for w in json.loads(row["suggestion"]).get("warnings", [])):
             log.warning("%s ticket %s: the draft makes a promise, so it is not sent by tag", system.name,
                         inbound.external_id)
             return {**already, "ignored": "the draft makes a promise a person must read first: decide in the "
                                           "review page"}
         try:
-            result = self.review(tid, Review(action=decision, reviewer=actor or f"{system.name} agent"))
+            result = self.review(tid, Review(action=decision, reviewer=actor or f"{system.name} agent",
+                                             edited_reply=edited))
         except CopilotError as e:
             if e.status == 409:  # retried delivery, or the update caused by our own reply
                 return {**already, "ignored": "already decided"}

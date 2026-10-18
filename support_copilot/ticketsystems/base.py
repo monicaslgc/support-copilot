@@ -21,6 +21,7 @@ class InboundTicket:
     requester: str = "unknown"
     tags: tuple[str, ...] = ()  # the ticket's tags at the time of the webhook (how a person decides from the helpdesk)
     actor: str | None = None  # who triggered the webhook (an agent's email or name), when the payload says
+    edited_reply: str | None = None  # text of an internal [reply] note ("" if empty)
 
 
 def split_tags(value) -> tuple[str, ...]:
@@ -29,6 +30,17 @@ def split_tags(value) -> tuple[str, ...]:
         return ()
     items = re.split(r"[\s,]+", value) if isinstance(value, str) else [str(v) for v in value]
     return tuple(t.strip().lower() for t in items if t and t.strip())
+
+
+REPLY_MARKER = "[reply]"
+
+
+def extract_reply(text) -> str | None:
+    """The reply an agent wrote in an internal note that starts with `[reply]`, or None if it is not such a note."""
+    if not isinstance(text, str):
+        return None
+    text = text.strip()
+    return text[len(REPLY_MARKER):].strip() if text.lower().startswith(REPLY_MARKER) else None
 
 
 class WebhookError(ValueError):

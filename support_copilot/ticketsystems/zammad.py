@@ -13,7 +13,7 @@ import os
 from collections.abc import Mapping
 
 from ..models import Priority
-from .base import InboundTicket, TicketSystem, WebhookError, split_tags
+from .base import InboundTicket, TicketSystem, WebhookError, extract_reply, split_tags
 
 PRIORITY_ID = {Priority.P1: 3, Priority.P2: 3, Priority.P3: 2, Priority.P4: 1}
 
@@ -78,8 +78,10 @@ class ZammadSystem(TicketSystem):
         who = text(article.get("from"), text(ticket.get("customer"), "unknown"))
         by = ticket.get("updated_by")
         actor = (by.get("email") or by.get("login")) if isinstance(by, dict) else by
+        # an edited reply is only ever taken from an internal article: a customer's message is never the reply
+        edited = extract_reply(article.get("body")) if article.get("internal") is True else None
         return InboundTicket(str(ext_id), title, body, who, split_tags(ticket.get("tags")),
-                             actor if isinstance(actor, str) and actor.strip() else None)
+                             actor if isinstance(actor, str) and actor.strip() else None, edited)
 
     probe_path = "/api/v1/users/me"
 

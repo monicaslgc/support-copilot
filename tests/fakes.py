@@ -53,12 +53,15 @@ class FakeZendesk(FakeSystem):
     def make(self):
         return ZendeskSystem("acme", "a@acme.com", "tok", transport=self.transport())
 
-    def payload(self, tid, subject, desc, who, agent=None, with_tags=False):
+    def payload(self, tid, subject, desc, who, agent=None, with_tags=False, note=None):
         """The webhook body. `with_tags` is a ticket update: it carries the ticket's tags as they are now, in the
-        form a Zendesk webhook template renders them (one space separated string)."""
+        form a Zendesk webhook template renders them (one space separated string). `note` is the latest internal
+        note the agent wrote in the same update."""
         body = {"ticket_id": str(tid), "subject": subject, "description": desc, "requester": who}
         if with_tags:
             body.update(tags=" ".join(sorted(self.tickets[int(tid)]["tags"])), agent=agent)
+        if note is not None:
+            body["internal_comment"] = note
         return body
 
     def handler(self, req: httpx.Request):
@@ -90,11 +93,14 @@ class FakeZammad(FakeSystem):
     def make(self):
         return ZammadSystem("https://help.example.com", "tok", transport=self.transport())
 
-    def payload(self, tid, subject, desc, who, agent=None, with_tags=False):
+    def payload(self, tid, subject, desc, who, agent=None, with_tags=False, note=None):
         ticket = {"id": int(tid), "title": subject, "customer": who}
         if with_tags:
             ticket.update(tags=sorted(self.tickets[int(tid)]["tags"]), updated_by={"email": agent})
-        return {"ticket": ticket, "article": {"body": desc, "from": who}}
+        article = {"body": desc, "from": who}
+        if note is not None:  # the article this update created: an internal note by the agent
+            article = {"body": note, "from": agent, "internal": True}
+        return {"ticket": ticket, "article": article}
 
     def priority(self, tid):
         pid = self.tickets[int(tid)]["priority"]

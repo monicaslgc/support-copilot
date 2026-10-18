@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, ValidationError
 
 from ..models import Category, Priority
-from .base import InboundTicket, TicketSystem, WebhookError, split_tags
+from .base import InboundTicket, TicketSystem, WebhookError, extract_reply, split_tags
 
 PRIORITY_MAP = {Priority.P1: "urgent", Priority.P2: "high", Priority.P3: "normal", Priority.P4: "low"}
 TYPE_MAP = {  # Zendesk types: problem | incident | question | task
@@ -57,6 +57,7 @@ class _Payload(BaseModel):
     requester: str = "unknown"
     tags: list[str] | str | None = None  # template: "{{ticket.tags}}" (renders as a space separated string)
     agent: str | None = None  # template: "{{current_user.email}}"
+    internal_comment: str | None = None  # a placeholder for the latest INTERNAL note only
 
 
 class ZendeskSystem(TicketSystem):
@@ -97,7 +98,7 @@ class ZendeskSystem(TicketSystem):
         except ValidationError as e:
             raise WebhookError(str(e)) from e
         return InboundTicket(str(p.ticket_id), p.subject, p.description, p.requester, split_tags(p.tags),
-                             p.agent or None)
+                             p.agent or None, extract_reply(p.internal_comment))
 
     probe_path = "/api/v2/users/me.json"
 
