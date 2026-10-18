@@ -27,4 +27,3 @@ What is not verified, what is a baseline, and what comes next. Back to the [READ
 - Embeddings (for example pgvector) and PostgreSQL instead of TF-IDF and SQLite
 - A background queue for model calls and ticket-system pushes, so a bulk review of a big incident is not one long request
 - A release on PyPI (today it installs from GitHub)
-- Build and run the Dockerfile and compose file on a machine with Docker (they are written and statically checked, but have not been built)

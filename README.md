@@ -29,14 +29,14 @@ This project explores the cautious end of that question: **the AI only suggests,
 |---|---|
 | **Triage** | Category, P1-P4 priority, owning team, sentiment and language. Claude when an API key is set, plain rules otherwise. [How](docs/features.md#how-the-ai-part-works-claude-or-rules) |
 | **Grounded drafts** | Finds the matching knowledge-base article and drafts a reply in the customer's language, with an apology if they are upset. |
-| **Decide in your helpdesk** | The note on the ticket says: add `ai_approve` to send the drafted reply, `ai_reject` to answer yourself. The decision is attributed to the agent. [Setup](docs/integrations.md#deciding-from-inside-the-helpdesk) |
+| **Decide in your helpdesk** | The note on the ticket says: add `ai_approve` to send the drafted reply, `ai_reject` to answer yourself, or add an internal `[reply]` note with your own text to send that instead. The decision is attributed to the agent. [Setup](docs/integrations.md#deciding-from-inside-the-helpdesk) |
 | **Review page** (optional) | Sorted by urgency. Edit the reply, override the triage, approve or reject, answer an incident in one click. The reply that was actually sent is kept. [The page](docs/features.md#the-review-page) |
 | **Incidents and duplicates** | Groups tickets about the same issue. Several customers become a possible incident, answered with one click. [Details](docs/features.md#duplicates-and-incident-spikes) |
 | **Customer context** | Earlier tickets from the same customer; an upset customer moves a routine ticket up a level. [Details](docs/features.md#sentiment-language-and-customer-context) |
 | **Feedback loop** | Records why a reviewer corrected the AI, and reports per category how often it was right. [Details](docs/features.md#feedback-why-people-correct-the-ai-and-where-it-has-earned-more-autonomy) |
 | **Guardrails** | Masks emails, cards, IBANs, phones and passwords before the model sees them, and flags refund or deadline promises in drafts. [Details](docs/features.md#guardrails-around-the-model) |
 | **Your names and tags** | Every tag, category name and team name it writes is yours to set, so your triggers and views route on them. [Taxonomy](docs/embedding.md#your-tags-names-and-who-may-decide) |
-| **Ticket systems** | Zammad and Zendesk behind one interface: the AI's notes stay internal, tags are added never replaced, and the public reply only goes out after approval. [Details](docs/integrations.md) |
+| **Ticket systems** | Zammad and Zendesk behind one interface (failed sends are logged and can be retried from `/outbox`; old signed Zendesk webhooks are refused): the AI's notes stay internal, tags are added never replaced, and the public reply only goes out after approval. [Details](docs/integrations.md) |
 
 Twelve [user stories](docs/user-stories.md) (support agents, support leads, admins and customers) spell out what each of them needs. Each one is checked by a test, and most by a scenario you can watch run.
 
@@ -130,7 +130,7 @@ pytest                                 # 627 tests, offline
 ## Documentation
 
 **Run it**
-- [Run it against your environment](docs/getting-started.md): install, configure, check, connect, verify, troubleshoot
+- [Run it against your environment](docs/getting-started.md): install, configure, check, connect, verify, troubleshoot, or run it in Docker
 - [Ticket system integrations](docs/integrations.md): Zammad, Zendesk, approving by tag, adding another system
 - [Embedding guide](docs/embedding.md): your own articles, database, API key, tags and ticket systems
 - [API and configuration](docs/api.md): every route and every environment variable

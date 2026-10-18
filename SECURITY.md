@@ -4,7 +4,7 @@ This is a concept project: it has not been security-reviewed or run against a li
 
 ## What is in place
 
-- Webhooks are verified with each system's signature (Zammad HMAC-SHA1, Zendesk HMAC-SHA256 with timestamp) when its secret is set.
+- Webhooks are verified with each system's signature (Zammad HMAC-SHA1, Zendesk HMAC-SHA256 with timestamp) when its secret is set. A signed Zendesk webhook older than `WEBHOOK_MAX_AGE_SECONDS` (default 5 minutes) is refused, so a captured request cannot be replayed later.
 - A decision made by tagging a ticket in the helpdesk is only accepted for a connected system when its webhook secret is set, because it sends a reply to a customer.
 - The review API can require `X-API-Key` (`API_KEY`).
 - Private details (emails, cards, IBANs, phones, passwords) are masked before text goes to the model.

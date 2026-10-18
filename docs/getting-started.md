@@ -65,7 +65,7 @@ No helpdesk is involved and nothing is stored.
 
 ## Running it in Docker
 
-The repository has a `Dockerfile` and a `docker-compose.yml` for the reference server (not yet built or run on a machine with Docker by the author: CI builds the image and calls `/health`). Put your settings in a `.env` file next to the compose file; `API_KEY` is required, and every other variable in [API and configuration](api.md) listed in the compose file is passed through when you set it.
+The repository has a `Dockerfile` and a `docker-compose.yml` for the reference server (CI builds the image, starts it and calls `/health` on every push; it has not been run against a live helpdesk). Put your settings in a `.env` file next to the compose file; `API_KEY` is required, and every other variable in [API and configuration](api.md) listed in the compose file is passed through when you set it.
 
 ```bash
 echo "API_KEY=$(openssl rand -hex 24)" > .env
