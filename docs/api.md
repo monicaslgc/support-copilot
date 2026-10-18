@@ -17,7 +17,8 @@ These are the routes of `create_router(copilot)` (see the [embedding guide](embe
 | POST | `/check-reply` | Promises (refunds, guarantees, amounts, deadlines) in a reply about to be sent |
 | POST | `/tickets/{id}/review` | Human approves or rejects; can correct priority, category and reply |
 | POST | `/webhooks/{system}` | Inbound webhook from a ticket system (`zammad`, `zendesk`): a new ticket is triaged and queued; an update that adds `ai_approve` or `ai_reject` to a ticket already queued is the person's decision (see below) |
-| GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`) |
+| GET | `/outbox` | Audit log of calls to ticket systems (`sent`, `dry_run`, `error`). A retry shows `retry_of` |
+| POST | `/outbox/{id}/retry` | Send a failed (`error`) entry again, as recorded. `409` if it did not fail, a retry already sent it, or no request was recorded; `404` if unknown |
 | GET | `/metrics` | Human vs AI agreement and reply edit rate |
 | GET | `/metrics/breakdown` | Per category: clean rate, its lower bound, rejections, reasons, automation candidates |
 | GET | `/health` | Liveness, whether the LLM is enabled, which ticket systems are configured |
@@ -45,6 +46,7 @@ All settings of the reference server are environment variables. (When you embed 
 | `ZAMMAD_WEBHOOK_SECRET` | not set | Verifies the HMAC-SHA1 signature of Zammad webhooks |
 | `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN` | not set | Connect the Zendesk adapter (otherwise it runs in dry-run) |
 | `ZENDESK_WEBHOOK_SECRET` | not set | Verifies the HMAC-SHA256 signature of Zendesk webhooks |
+| `WEBHOOK_MAX_AGE_SECONDS` | `300` | A signed Zendesk webhook whose timestamp is older (or further in the future) than this is refused with `401`, so a captured request cannot be replayed. `0` turns the check off. Zammad's signature has no timestamp, so it cannot be checked there |
 | `TAG_PREFIX` | `ai_` | In front of every tag written to the helpdesk (`ai_triaged`, `ai_cat_...`) |
 | `APPROVE_TAG`, `REJECT_TAG` | `approve`, `reject` | The tags (after the prefix) an agent adds to send or discard the draft |
 | `HELPDESK_DECISIONS` | `1` | `0` turns off approving by tag: only the review page and the API decide |

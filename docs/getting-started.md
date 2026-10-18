@@ -63,6 +63,17 @@ What to look at:
 
 No helpdesk is involved and nothing is stored.
 
+## Running it in Docker
+
+The repository has a `Dockerfile` and a `docker-compose.yml` for the reference server (not yet built or run on a machine with Docker by the author: CI builds the image and calls `/health`). Put your settings in a `.env` file next to the compose file; `API_KEY` is required, and every other variable in [API and configuration](api.md) listed in the compose file is passed through when you set it.
+
+```bash
+echo "API_KEY=$(openssl rand -hex 24)" > .env
+docker compose up --build        # review page at http://127.0.0.1:8000/
+```
+
+The database is the volume `copilot-data`, mounted at `/data` (all tickets and decisions: back it up). The port is published on this machine only: put HTTPS in front of it, with a reverse proxy, before a helpdesk calls it. One container only, since the database is a single SQLite file.
+
 ## 4. Configure
 
 The reference server reads environment variables only (there is no config file or `.env` loader: use your shell, a systemd `EnvironmentFile=`, or `docker run --env-file`). Nothing is required. The ones you will set first:
@@ -171,7 +182,7 @@ Nothing else in your helpdesk depends on it. The tags it added stay on the ticke
 ## Running it
 
 - **Logs.** Warnings (a model fallback, a failed helpdesk call, a decision that was ignored and why) go to the `support_copilot` logger and appear on stderr.
-- **Failures.** A failed call to your helpdesk never loses the triage or a decision: it is recorded in `GET /outbox` with `"mode": "error"`. There is no automatic retry yet.
+- **Failures.** A failed call to your helpdesk never loses the triage or a decision: it is recorded in `GET /outbox` with `"mode": "error"`. Send it again with `POST /outbox/{id}/retry` once the cause is fixed; there is no automatic retry yet.
 - **How the AI is doing.** `GET /metrics/breakdown`, or the Insights tab of the review page: per category, how often agents approve untouched, with a confidence bound, and why they correct it. Nothing is automated from it.
 - **Backups.** Back up the SQLite file (`sqlite3 triage.db ".backup backup.db"` is safe while the server runs). It holds ticket text and decisions: protect it like the helpdesk itself. There is no retention job yet; if your policy needs one, that is a manual step on this file.
 - **Upgrades.** The database is upgraded on start. Back it up first, then `pip install --upgrade` and restart.

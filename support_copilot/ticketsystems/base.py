@@ -107,8 +107,16 @@ class TicketSystem(ABC):
         """Send requests in order, or return them untouched in dry-run (no credentials)."""
         if not self.configured:
             return {"mode": "dry_run", "requests": requests}
-        with httpx.Client(transport=self.transport, timeout=10, base_url=self.base_url,
-                          headers=self.auth_headers(), auth=self.basic_auth()) as http:
-            for r in requests:
-                http.request(r["method"], r["path"], json=r["json"]).raise_for_status()
+        try:
+            with httpx.Client(transport=self.transport, timeout=10, base_url=self.base_url,
+                              headers=self.auth_headers(), auth=self.basic_auth()) as http:
+                for r in requests:
+                    http.request(r["method"], r["path"], json=r["json"]).raise_for_status()
+        except Exception as e:
+            e.requests = requests  # type: ignore[attr-defined]  # kept in the outbox so a failed send can be retried
+            raise
         return {"mode": "sent", "requests": requests}
+
+    def resend(self, requests: list[dict]) -> dict:
+        """Send requests again, as recorded in the outbox."""
+        return self._execute(requests)

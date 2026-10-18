@@ -1,0 +1,31 @@
+# docker compose up --build
+# Put your settings in a .env file next to this one (see docs/api.md for every variable). API_KEY is required.
+# A variable written without a value is passed on only when you set it: an empty value would not mean "not set"
+# to the app (an empty ALLOWED_REVIEWERS, for one, is an error).
+services:
+  copilot:
+    build: .
+    image: support-copilot
+    ports:
+      - "127.0.0.1:8000:8000"   # this machine only; put HTTPS in front of it (a reverse proxy) for your helpdesk
+    environment:
+      - API_KEY=${API_KEY:?set API_KEY in .env: it protects the review page and API}
+      - ANTHROPIC_API_KEY
+      - TRIAGE_MODEL
+      - KB_DIR
+      - ZENDESK_SUBDOMAIN
+      - ZENDESK_EMAIL
+      - ZENDESK_API_TOKEN
+      - ZENDESK_WEBHOOK_SECRET
+      - ZAMMAD_URL
+      - ZAMMAD_TOKEN
+      - ZAMMAD_WEBHOOK_SECRET
+      - ALLOWED_REVIEWERS
+      - WEBHOOK_MAX_AGE_SECONDS
+    volumes:
+      - copilot-data:/data
+      # - ./articles:/articles:ro   # your help articles, then set KB_DIR=/articles in .env
+    restart: unless-stopped
+
+volumes:
+  copilot-data:

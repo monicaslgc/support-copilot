@@ -37,7 +37,8 @@ def init(conn: sqlite3.Connection) -> sqlite3.Connection:
             system TEXT NOT NULL, external_id TEXT NOT NULL,
             kind TEXT NOT NULL,                 -- triage_note | public_reply | rejection_note
             mode TEXT NOT NULL,                 -- sent | dry_run | error
-            payload TEXT NOT NULL, error TEXT
+            payload TEXT NOT NULL, error TEXT,
+            retry_of INTEGER                    -- on a retry: the earlier, failed entry it sends again
         );
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +62,8 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
     wanted = {"tickets": {"topic": "TEXT", "cluster_id": "INTEGER", "duplicate_of": "INTEGER",
                           "category": "TEXT", "priority": "TEXT", "customer_key": "TEXT",
                           "armed": "INTEGER NOT NULL DEFAULT 1"},
-              "reviews": {"ai_reply": "TEXT", "reasons": "TEXT", "note": "TEXT"}}
+              "reviews": {"ai_reply": "TEXT", "reasons": "TEXT", "note": "TEXT"},
+              "outbox": {"retry_of": "INTEGER"}}
     for table, cols in wanted.items():
         have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         for name, ddl in cols.items():

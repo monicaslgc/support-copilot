@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import os
 from collections.abc import Mapping
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 
@@ -22,6 +23,31 @@ def verify_signature(secret: str, timestamp: str, body: bytes, signature: str) -
     digest = hmac.new(secret.encode(), timestamp.encode() + body, hashlib.sha256).digest()
     # as bytes: compare_digest raises on text that is not ASCII, and a header is anything a caller sends
     return hmac.compare_digest(base64.b64encode(digest), (signature or "").encode("utf-8", "replace"))
+
+
+DEFAULT_MAX_AGE_SECONDS = 300
+
+
+def max_age_seconds() -> int:
+    """How old a signed webhook may be (WEBHOOK_MAX_AGE_SECONDS, default 300; 0 turns the check off)."""
+    try:
+        return max(0, int(os.getenv("WEBHOOK_MAX_AGE_SECONDS", DEFAULT_MAX_AGE_SECONDS)))
+    except ValueError:
+        return DEFAULT_MAX_AGE_SECONDS
+
+
+def timestamp_is_fresh(timestamp: str, max_age: int, now: datetime | None = None) -> bool:
+    """True if the signed timestamp (ISO 8601, e.g. 2026-10-16T10:00:00Z) is within `max_age` seconds of now.
+    Unreadable counts as stale; a timestamp too far in the future is refused too."""
+    if max_age <= 0:
+        return True
+    try:
+        sent = datetime.fromisoformat(timestamp.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if sent.tzinfo is None:
+        sent = sent.replace(tzinfo=UTC)
+    return abs(((now or datetime.now(UTC)) - sent).total_seconds()) <= max_age
 
 
 class _Payload(BaseModel):
@@ -60,8 +86,10 @@ class ZendeskSystem(TicketSystem):
         secret = os.getenv(self.secret_env)
         if not secret:
             return True
-        return verify_signature(secret, headers.get("X-Zendesk-Webhook-Signature-Timestamp", ""), raw,
-                                headers.get("X-Zendesk-Webhook-Signature", ""))
+        timestamp = headers.get("X-Zendesk-Webhook-Signature-Timestamp", "")
+        # the timestamp is part of what is signed, so a captured request cannot be replayed with a newer one
+        return (verify_signature(secret, timestamp, raw, headers.get("X-Zendesk-Webhook-Signature", ""))
+                and timestamp_is_fresh(timestamp, max_age_seconds()))
 
     def parse_webhook(self, raw: bytes) -> InboundTicket:
         try:

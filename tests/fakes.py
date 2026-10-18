@@ -5,10 +5,16 @@ and expose the same read API so one scenario can be asserted against both system
 """
 import base64
 import json
+from datetime import UTC, datetime
 
 import httpx
 
 from support_copilot.ticketsystems import ZammadSystem, ZendeskSystem
+
+
+def fresh_ts() -> str:
+    """A Zendesk webhook timestamp for now: a signed request older than five minutes is refused."""
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class FakeSystem:

@@ -331,12 +331,43 @@ class Copilot:
             mode, payload, err = res["mode"], {"requests": res["requests"]}, None
         except Exception as e:  # noqa: BLE001 - any failure is recorded in the outbox, never raised to the caller
             log.warning("%s %s failed for %s: %s", system.name, kind, ext_id, e)
-            mode, payload, err = "error", {"kind": kind}, str(e)
+            mode, payload, err = "error", {"kind": kind, "requests": getattr(e, "requests", None)}, str(e)
+        return self._log_outbox(system.name, ext_id, kind, mode, payload, err)
+
+    def _log_outbox(self, system: str, ext_id: str, kind: str, mode: str, payload: dict, err: str | None,
+                    retry_of: int | None = None) -> str:
         with self._transaction() as conn:
             conn.execute(
-                "INSERT INTO outbox (created_at, system, external_id, kind, mode, payload, error)"
-                " VALUES (?,?,?,?,?,?,?)", (database.now(), system.name, ext_id, kind, mode, json.dumps(payload), err))
+                "INSERT INTO outbox (created_at, system, external_id, kind, mode, payload, error, retry_of)"
+                " VALUES (?,?,?,?,?,?,?,?)",
+                (database.now(), system, ext_id, kind, mode, json.dumps(payload), err, retry_of))
         return mode
+
+    def retry_outbox(self, outbox_id: int) -> dict:
+        """Send a failed ticket-system call again, exactly as recorded. Only an `error` entry that no retry has
+        already sent can be retried. All calls recorded together are sent again, so one that went through before
+        the failure is repeated (a second internal note, for example)."""
+        row = self.fetch_one("SELECT * FROM outbox WHERE id = ?", (outbox_id,))
+        if not row:
+            raise CopilotError(404, f"outbox entry {outbox_id} not found")
+        if row["mode"] != "error":
+            raise CopilotError(409, f"outbox entry {outbox_id} did not fail (mode {row['mode']}): nothing to retry")
+        if self.fetch_one("SELECT id FROM outbox WHERE retry_of = ? AND mode = 'sent'", (outbox_id,)):
+            raise CopilotError(409, f"outbox entry {outbox_id} was already sent by a retry")
+        requests = json.loads(row["payload"]).get("requests")
+        if not requests:
+            raise CopilotError(409, f"outbox entry {outbox_id} has no recorded request to send again")
+        system = self.systems.get(row["system"])
+        if not system:
+            raise CopilotError(404, f"unknown ticket system '{row['system']}'")
+        try:
+            res = system.resend(requests)
+            mode, payload, err = res["mode"], {"requests": res["requests"]}, None
+        except Exception as e:  # noqa: BLE001 - recorded like any other failed send
+            log.warning("%s retry of outbox %s failed: %s", system.name, outbox_id, e)
+            mode, payload, err = "error", {"kind": row["kind"], "requests": requests}, str(e)
+        self._log_outbox(system.name, row["external_id"], row["kind"], mode, payload, err, retry_of=outbox_id)
+        return {"retry_of": outbox_id, "mode": mode, "error": err}
 
     def _context(self, tid: int) -> dict:
         """What we know about how this ticket relates to others, for the internal note and tags."""

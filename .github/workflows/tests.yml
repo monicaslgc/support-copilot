@@ -41,3 +41,19 @@ jobs:
           /tmp/clean/bin/python -m support_copilot.doctor | tail -2
           echo '[{"subject":"Invoice wrong","body":"I was charged twice, please refund"}]' > tickets.json
           /tmp/clean/bin/python -m support_copilot.evaluate tickets.json --preview 0 | head -1
+
+  # The Dockerfile and compose file: build the image, start it with a key, and ask it for /health.
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t support-copilot .
+      - name: Start the container and call /health
+        run: |
+          docker run -d --name copilot -p 8000:8000 -e API_KEY=ci-key support-copilot
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -fs http://127.0.0.1:8000/health | grep '"status":"ok"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/tickets)" = 401
+          docker logs copilot
+      - name: Compose refuses to start without an API key
+        run: "! docker compose config"

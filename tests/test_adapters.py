@@ -11,7 +11,7 @@ from support_copilot import main
 from support_copilot.models import Category, Priority
 from support_copilot.ticketsystems import WebhookError, ZammadSystem
 from support_copilot.ticketsystems.zendesk import verify_signature as zd_verify
-from tests.fakes import FakeZammad, FakeZendesk
+from tests.fakes import FakeZammad, FakeZendesk, fresh_ts
 
 ZD = {"ticket_id": "4711", "subject": "Duplicate charge on invoice",
       "description": "I was charged twice, I want a refund.", "requester": "Sam"}
@@ -52,7 +52,7 @@ def test_zendesk_signature(monkeypatch):
     monkeypatch.setenv("ZENDESK_WEBHOOK_SECRET", "s3cret")
     c = TestClient(main.app)
     raw = json.dumps({**ZD, "ticket_id": "9100"}).encode()
-    ts = "2026-10-15T10:00:00Z"
+    ts = fresh_ts()
     sig = base64.b64encode(hmac.new(b"s3cret", ts.encode() + raw, hashlib.sha256).digest()).decode()
     h = {"content-type": "application/json", "X-Zendesk-Webhook-Signature-Timestamp": ts}
     assert c.post("/webhooks/zendesk", content=raw, headers=h).status_code == 401

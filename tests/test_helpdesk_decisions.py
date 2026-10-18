@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from support_copilot import TicketIn, main
 from support_copilot.config import Taxonomy
 from support_copilot.ticketsystems.base import split_tags
-from tests.fakes import FakeZammad, FakeZendesk
+from tests.fakes import FakeZammad, FakeZendesk, fresh_ts
 from tests.test_e2e_flow import Env
 from tests.test_robustness import run_threads
 
@@ -188,7 +188,7 @@ def queued_for(env, tid=100):
 def signed(env, body: bytes, secret: str) -> dict:
     """The headers the helpdesk would send with this body."""
     if env.name == "zendesk":
-        ts = "2026-10-16T10:00:00Z"
+        ts = fresh_ts()
         digest = hmac.new(secret.encode(), ts.encode() + body, hashlib.sha256).digest()
         return {"X-Zendesk-Webhook-Signature-Timestamp": ts,
                 "X-Zendesk-Webhook-Signature": base64.b64encode(digest).decode()}

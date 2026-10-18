@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from support_copilot import main
 from support_copilot.ticketsystems import ZammadSystem, ZendeskSystem
+from tests.fakes import fresh_ts
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("demo", ROOT / "scripts" / "demo.py")
@@ -127,7 +128,7 @@ def test_the_signing_recipes_in_the_examples_readme_produce_valid_signatures(mon
     assert ok.status_code == 201
     assert c.post("/webhooks/zammad", content=body, headers={"content-type": "application/json"}).status_code == 401
 
-    ts = "2026-10-16T10:00:00Z"
+    ts = fresh_ts()
     d_sig = sh(f"( printf '%s' '{ts}'; cat examples/zendesk_webhook.json ) "
                "| openssl dgst -sha256 -hmac s3cret -binary | base64")
     body = (ROOT / "examples" / "zendesk_webhook.json").read_bytes()

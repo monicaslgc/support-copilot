@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from support_copilot import main
 from support_copilot.ticketsystems import ZendeskSystem
-from tests.fakes import FakeZammad, FakeZendesk
+from tests.fakes import FakeZammad, FakeZendesk, fresh_ts
 from tests.test_clusters import OUTAGES
 from tests.test_llm import GOOD, FakeAnthropic, block, reply
 
@@ -251,7 +251,7 @@ def test_us09_the_ticket_system_can_be_connected_safely(monkeypatch):
     assert c.post("/webhooks/zammad", content=raw, headers=headers).status_code == 401
     assert c.post("/webhooks/zammad", content=raw, headers={**headers, "X-Hub-Signature": sig}).status_code == 201
 
-    raw2, ts = json.dumps(zendesk.payload(2, *BILLING, "Ana")).encode(), "2026-10-16T10:00:00Z"
+    raw2, ts = json.dumps(zendesk.payload(2, *BILLING, "Ana")).encode(), fresh_ts()
     sig2 = base64.b64encode(hmac.new(b"s3cret", ts.encode() + raw2, hashlib.sha256).digest()).decode()
     zd_headers = {**headers, "X-Zendesk-Webhook-Signature-Timestamp": ts}
     bad = {**zd_headers, "X-Zendesk-Webhook-Signature": "bad"}

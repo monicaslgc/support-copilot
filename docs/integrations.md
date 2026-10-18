@@ -14,7 +14,7 @@ Guarantees, enforced by the same end-to-end tests for every system:
 - The customer never sees the AI suggestion, only the reply a human approved.
 - Tags are added, never replaced, so the ones an agent already set survive.
 - Webhooks are idempotent per `(system, ticket id)`, since ticket systems retry failed deliveries. Two systems can use the same ticket id without colliding.
-- If the ticket system is unreachable, the triage and the human's decision are kept and the failure is logged in `/outbox`. There is no automatic retry yet.
+- If the ticket system is unreachable, the triage and the human's decision are kept and the failure is logged in `/outbox`. `POST /outbox/{id}/retry` sends it again on demand; there is no automatic retry yet.
 - Dry-run records the exact requests that would be sent.
 
 | | Zammad | Zendesk |

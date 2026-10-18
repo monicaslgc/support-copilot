@@ -101,6 +101,12 @@ def create_router(cp: Copilot) -> APIRouter:
         """Audit log of calls to ticket systems (sent / dry_run / error)."""
         return cp.outbox(limit)
 
+    @api.post("/outbox/{outbox_id}/retry", tags=["metrics"])
+    @_http
+    def retry_outbox(outbox_id: TicketId):
+        """Send a failed ticket-system call again. `409` if it did not fail or a retry already sent it."""
+        return cp.retry_outbox(outbox_id)
+
     @router.post("/webhooks/{system_name}", status_code=201, tags=["webhooks"])
     async def ticket_system_webhook(system_name: str, request: Request):
         """Inbound webhook from a ticket system (zendesk, zammad). Configure it on 'ticket created'."""

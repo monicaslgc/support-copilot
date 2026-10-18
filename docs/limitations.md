@@ -10,7 +10,8 @@ What is not verified, what is a baseline, and what comes next. Back to the [READ
 - The rule-based sentiment and language detection is a small word list, not a model: it misses sarcasm and subtle anger, and short or mixed-language text is often `und`. Treat it as a baseline.
 - Rule-based classification is a baseline, not a production classifier.
 - Zammad: an approved reply is created as a non-internal `note` article, which the customer can see in the web portal. Zammad only emails the customer for an `email` article with a `to` address, and the adapter does not set those (the customer's address is not stored yet), so the customer may not get an email. Zendesk's public comment does notify the requester. Not verified against a live Zammad.
-- No automatic retry for failed ticket-system calls, and no button to send again: the decision is saved, the review page shows the failure in red, and `/outbox` holds the error; the reply has to be sent by hand in the helpdesk. No check on webhook timestamp age.
+- No automatic retry for failed ticket-system calls: the decision is saved, the review page shows the failure in red, and `/outbox` holds the error and the request. `POST /outbox/{id}/retry` sends it again on demand; if several calls were recorded together, all are repeated (a second internal note, for example). Entries from before this version have no recorded request and cannot be retried.
+- The webhook timestamp age is checked for Zendesk only (`WEBHOOK_MAX_AGE_SECONDS`); Zammad's signature does not include a timestamp. Within the window a replay is still possible, though a re-sent ticket changes nothing.
 - A multi-request update (for example Zammad's priority + note + tags) is not transactional: if one call fails midway, the earlier ones stay applied.
 - The webhook body is capped at 1 MB in the app; also limit the request size in your reverse proxy, which sees it first.
 - Customers are compared by name as the helpdesk sends it (case and spacing ignored): two different people with the same name count as one, and one person who writes under two names counts as two.
@@ -21,11 +22,10 @@ What is not verified, what is a baseline, and what comes next. Back to the [READ
 
 - Run the Zammad and Zendesk adapters against real instances and fix whatever differs from the documentation: the webhook payloads that carry tags and the acting agent, and the type of the article that carries a Zammad reply (so the customer is emailed)
 - Let an agent edit the reply before approving from the helpdesk, not only approve or reject it as drafted
-- Check the age of a webhook's timestamp, and retry failed ticket-system calls
+- Retry failed ticket-system calls automatically, not only on demand
 - Run the Claude path against the live API and compare the model with the rules on a labelled evaluation set
 - Feed the correction reasons back into the prompts and into that evaluation set
 - Embeddings (for example pgvector) and PostgreSQL instead of TF-IDF and SQLite
 - A background queue for model calls and ticket-system pushes, so a bulk review of a big incident is not one long request
-- Retry of failed `/outbox` entries
 - A release on PyPI (today it installs from GitHub)
-- A Dockerfile and compose file (not written yet because they could not be built and checked where this was developed)
+- Build and run the Dockerfile and compose file on a machine with Docker (they are written and statically checked, but have not been built)
