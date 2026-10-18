@@ -15,18 +15,18 @@
 @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("/static/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
 :root {
   /* Colour tokens. Rust and ochre are semantic only (warnings); --muted is dark enough for small text (AA). */
-  --cream: #F4F1E8; --sage: #A0B3A0; --forest: #153D32; --charcoal: #202A27; --muted-green: #6F8876;
-  --bg: var(--cream); --panel: #FAF8F2; --ink: var(--charcoal); --muted: #4C6354; --line: #D6D9D0;
-  --accent: var(--forest); --accent-ink: var(--cream); --ai-bg: #E3EAE2; --ai-line: var(--sage);
+  --cream: #F6F2E9; --sage: #A8B29A; --forest: #263C32; --charcoal: #353832; --muted-green: #7F8F78;
+  --bg: var(--cream); --panel: #FAF8F2; --ink: var(--charcoal); --muted: #5E6A60; --line: #D9D9CD;
+  --accent: var(--forest); --accent-ink: var(--cream); --ai-bg: #E8E9DC; --ai-line: var(--sage);
   --ok: var(--forest); --bad: #9B2F22; --bad-bg: #F6E4DA; --warn: #8A5A12; --warn-bg: #F3E8D2;
-  --p1: #9B2F22; --p2: #8A5A12; --p3: var(--forest); --p4: #4C6354; --focus: var(--forest);
+  --p1: #9B2F22; --p2: #8A5A12; --p3: var(--forest); --p4: #5E6A60; --focus: var(--forest);
   --serif: "DM Serif Display", "Cormorant Garamond", Georgia, serif;
   --sans: Inter, "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #121A16; --panel: #19231E; --ink: #F4F1E8; --muted: #A9B8AA; --line: #2B3A32;
+    --bg: #121A16; --panel: #19231E; --ink: #F6F2E9; --muted: #A9B8AA; --line: #2B3A32;
     --accent: var(--sage); --accent-ink: #12201A; --ai-bg: #1F2B25; --ai-line: #4A5E50;
     --ok: var(--sage); --bad: #F0907F; --bad-bg: #2A1D19; --warn: #E0B060; --warn-bg: #2B2518;
     --p1: #F0907F; --p2: #E0B060; --p3: var(--sage); --p4: #A9B8AA; --focus: var(--sage);
